@@ -1,0 +1,40 @@
+[project]
+name = "kora"
+version = "0.1.0"
+description = "KORA - Knowledge Oriented Retrieval Assistant (UV-based, Ollama + Granite 3.3:2b, Docling RAG)"
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+authors = [
+  { name = "Alex" }
+]
+
+dependencies = [
+  "gradio>=4.44.0",
+  "faiss-cpu>=1.8.0.post1",
+  "numpy>=1.26",
+  "scikit-learn>=1.4.0",
+  "httpx>=0.27.0",
+  "tqdm>=4.66.0",
+  "docling>=2.0.0",
+  "python-dotenv>=1.0.1",
+  "sentence-transformers>=3.0.1",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0.0",
+]
+
+[tool.uv]
+index-url = "https://pypi.org/simple"
+
+[project.scripts]
+kora-launch = "kora.launcher:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["kora"]

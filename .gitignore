@@ -1,0 +1,6 @@
+.kora/
+__pycache__/
+*.pyc
+.env
+RAG/*.tmp
+RAG/*.cache

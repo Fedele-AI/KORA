@@ -1,0 +1,50 @@
+Metadata-Version: 2.4
+Name: kora
+Version: 0.1.0
+Summary: KORA - Knowledge Oriented Retrieval Assistant (UV-based, Ollama + Granite 3.3:2b, Docling RAG)
+Author: Alex
+License-Expression: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: gradio>=4.44.0
+Requires-Dist: faiss-cpu>=1.8.0.post1
+Requires-Dist: numpy>=1.26
+Requires-Dist: scikit-learn>=1.4.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: tqdm>=4.66.0
+Requires-Dist: docling>=2.0.0
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: sentence-transformers>=3.0.1
+Provides-Extra: test
+Requires-Dist: pytest>=8.0.0; extra == "test"
+
+# KORA - Knowledge Oriented Retrieval Assistant
+
+KORA is a UV-based local RAG application that uses Docling for document ingestion, FAISS for vector search, and Ollama to chat with the IBM Granite 3.3:2b model. Documents are read from the `RAG/` folder and topK relevant chunks are provided as context for each query.
+
+## Requirements
+- macOS with Python 3.10+
+- UV (venv already created as per instructions)
+- Ollama installed and `granite3.3:2b` model already pulled
+
+## Quickstart
+```bash
+# From project root
+uv pip install -e .
+# Launch
+kora-launch
+```
+
+This will:
+- Ensure dependencies are installed
+- Create `RAG/` if missing
+- Build or load the FAISS index
+- Launch a Gradio web UI at http://127.0.0.1:7860
+
+## Usage
+- Drop PDFs/DOCX/TXT into `RAG/`
+- Use the UI to control topK and ask questions. The app will retrieve topK chunks and query the model via Ollama: `granite3.3:2b`.
+
+## Notes
+- Index is stored under `.kora/index/faiss_index` and `.kora/index/meta.json`.
+- To rebuild index, click the Rebuild button in the UI or delete the `.kora/index` folder.

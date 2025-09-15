@@ -1,0 +1,2 @@
+[console_scripts]
+kora-launch = kora.launcher:main
