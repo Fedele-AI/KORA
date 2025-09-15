@@ -1,7 +1,7 @@
 import gradio as gr
 from typing import List, Dict, Any
 
-from .rag import answer_question, rebuild_index
+from .rag import answer_question, rebuild_index, build_or_load_index
 
 
 HARD_CODED_MODEL = "granite3.3:2b"
@@ -19,9 +19,11 @@ def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int) -
 
 
 def build_interface() -> gr.Blocks:
-	# Always (re)build index on startup
-	startup_info = rebuild_index()
-	startup_msg = f"<span style='color: green;'>Index {startup_info['status']}. Chunks: {startup_info['num_chunks']}</span>"
+	# Try to load existing index first, only build if necessary
+	store, status = build_or_load_index(force_rebuild=False)
+	startup_info = {"status": status, "num_chunks": len(store.metadatas)}
+	status_text = "loaded from disk" if status == "loaded_from_disk" else "built"
+	startup_msg = f"<span style='color: green;'>Index {status_text}. Chunks: {startup_info['num_chunks']}</span>"
 
 	with gr.Blocks(title="KORA: Knowledge oriented reterival assistant - BETA") as demo:
 		gr.Markdown("""
