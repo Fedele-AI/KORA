@@ -25,11 +25,13 @@ def build_interface() -> gr.Blocks:
 	status_text = "loaded from disk" if status == "loaded_from_disk" else "built"
 	startup_msg = f"<span style='color: green;'>Index {status_text}. Chunks: {startup_info['num_chunks']}</span>"
 
-	with gr.Blocks(title="KORA: Knowledge oriented reterival assistant - BETA") as demo:
+	with gr.Blocks(title="KORA: Knowledge oriented retrieval assistant - BETA") as demo:
 		gr.Markdown("""
-		**KORA: Knowledge oriented reterival assistant - BETA**
-		
-		Uses Docling + FAISS to retrieve from files in `RAG/` and queries Ollama `granite3.3:2b`.
+		**KORA: Knowledge oriented retrieval assistant - BETA**
+
+		Designed by researchers at [Georgia Tech](https://gatech.edu).
+
+		Uses Docling + FAISS to retrieve content files, queries Ollama on port `granite3.3:2b`.
 		""")
 		with gr.Row():
 			topk = gr.Slider(label="topK", minimum=1, maximum=20, value=8, step=1)

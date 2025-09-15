@@ -81,7 +81,7 @@ def answer_question(query: str, top_k: int = 8, model: str = "granite3.3:2b", st
 	results = store.search(query=query, top_k=top_k)
 	context_block = format_context(results) if results else ""
 	system = (
-		"You are KORA. You are the Knowledge Oriented Retrieval Assistant. You are a helpful assistant created by researchers at Georgia Tech to help students with course content. Use ONLY the provided context to answer. If the answer is not in the context, say you don't know. Be concise."
+		"You are KORA - the Knowledge Oriented Retrieval Assistant. You are a helpful assistant created by researchers at Georgia Tech to help students with course content. Use ONLY the provided context to answer. If the answer is not in the context, say you don't know. Be concise."
 	)
 	prompt = (
 		f"System: {system}\n\nContext:\n{context_block}\n\nQuestion: {query}\n\nAnswer:"

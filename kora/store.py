@@ -34,7 +34,8 @@ class TfidfBackend:
 	def encode(self, texts: List[str]) -> np.ndarray:
 		if not self.fitted:
 			self.fit(texts)
-		arr = self.vectorizer.transform(texts).astype(np.float32).toarray()
+		sparse_matrix = self.vectorizer.transform(texts)
+		arr = np.array(sparse_matrix.todense(), dtype=np.float32)
 		return arr
 
 
@@ -76,7 +77,7 @@ class VectorStore:
 			embeddings = embeddings.reshape(1, -1)
 		embeddings = self._normalize(embeddings)
 		index = faiss.IndexFlatIP(embeddings.shape[1])
-		index.add(embeddings)
+		index.add(embeddings)  # type: ignore
 		self.index = index
 		self.metadatas = [
 			{"source": c[0], "chunk_id": c[2], "text": c[1]}
@@ -123,7 +124,7 @@ class VectorStore:
 		query_vec = self._normalize(query_vec)
 		# Initial embedding search (request a bit more to allow hybrid merge)
 		embed_k = min(max(top_k * 2, top_k), len(self.metadatas))
-		dists, idxs = self.index.search(query_vec, embed_k)
+		dists, idxs = self.index.search(query_vec, embed_k)  # type: ignore
 		indices = idxs[0].tolist()
 		scores = dists[0].tolist()
 		results_map: Dict[int, Dict[str, Any]] = {}
