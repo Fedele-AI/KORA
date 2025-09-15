@@ -7,15 +7,14 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Test on ${{ matrix.os }} with Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
+  test-ubuntu:
+    name: Test on ubuntu-latest with Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
     env:
       UV_PROJECT_ENVIRONMENT: .venv
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-14]
         python-version: ["3.12"]
 
     steps:
