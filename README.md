@@ -55,6 +55,8 @@ This will:
 - Use the UI to control topK and ask questions. The app retrieves topK chunks and queries Ollama `granite3.3:2b`.
 - Click “Rebuild Index” after adding or removing files from `RAG/`. A green notice will appear confirming the rebuild.
 
+<img width="1280" height="708" alt="image" src="https://github.com/user-attachments/assets/4fec1264-4a59-40fc-8451-3e485236d67e" />
+
 ## Architecture
 ```mermaid
 flowchart LR
