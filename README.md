@@ -1,5 +1,12 @@
 # KORA - Knowledge Oriented Retrieval Assistant
 
+<div align="center">
+
+<img width=50% alt="KORA" src="https://github.com/user-attachments/assets/ef94d0c0-ea4a-49de-ac25-e2523bc0fe3d" />
+
+
+</div>
+
 KORA is a UV-based local RAG application that uses Docling for document ingestion, FAISS for vector search, and Ollama to chat with the IBM Granite 3.3:2b model. Documents are read from the `RAG/` folder and topK relevant chunks are provided as context for each query.
 
 ## Requirements
