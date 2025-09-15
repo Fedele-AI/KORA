@@ -34,14 +34,14 @@ This will:
 ## Architecture
 ```mermaid
 flowchart LR
-    A[RAG folder (PDF, DOCX, TXT)] --> B[Docling Convert]
+    A["RAG folder (PDF, DOCX, TXT)"] --> B[Docling Convert]
     B --> C[Chunking]
-    C --> D[Embeddings (Sentence-Transformers)]
+    C --> D["Embeddings (Sentence-Transformers)"]
     D --> E[FAISS Index]
-    F[User Query] --> G[Retriever (topK)]
+    F[User Query] --> G["Retriever (topK)"]
     E --> G
-    G --> H[Prompt Builder (System: You are KORA)]
-    H --> I[Ollama granite3.3:2b]
+    G --> H["Prompt Builder (System: You are KORA)"]
+    H --> I["Ollama granite3.3:2b"]
     I --> J[Gradio UI]
 ```
 
