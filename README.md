@@ -15,8 +15,8 @@ This tool was created for `CEE 4803 - Art & Generative AI` at the [Georgia Insti
 
 ## Requirements
 - Python 3.10+ (uses UV for dependency management)
-- Ollama installed and `granite3.3:2b` model already pulled
-    - To install Ollama, follow instructions at: https://ollama.com/download
+- Ollama installed and running on port `11434` (default)
+    - ⚠️ To install Ollama, follow instructions at: https://ollama.com/download
 
 ## Quickstart
 ```bash
