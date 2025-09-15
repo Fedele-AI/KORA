@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from typing import List, Tuple, Dict, Any, Protocol, Optional
 
 import faiss  # type: ignore
@@ -120,18 +121,54 @@ class VectorStore:
 		if query_vec.ndim == 1:
 			query_vec = query_vec.reshape(1, -1)
 		query_vec = self._normalize(query_vec)
-		dists, idxs = self.index.search(query_vec, top_k)
+		# Initial embedding search (request a bit more to allow hybrid merge)
+		embed_k = min(max(top_k * 2, top_k), len(self.metadatas))
+		dists, idxs = self.index.search(query_vec, embed_k)
 		indices = idxs[0].tolist()
 		scores = dists[0].tolist()
-		results: List[Dict[str, Any]] = []
+		results_map: Dict[int, Dict[str, Any]] = {}
 		for i, score in zip(indices, scores):
 			if i < 0 or i >= len(self.metadatas):
 				continue
 			meta = self.metadatas[i]
-			results.append({
+			results_map[i] = {
 				"score": float(score),
 				"text": meta["text"],
 				"source": meta["source"],
 				"chunk_id": meta["chunk_id"],
-			})
-		return results
+			}
+
+		# Keyword fallback / boost: ensure rare or explicit terms surface
+		query_tokens = [t for t in re.findall(r"\w+", query.lower()) if len(t) > 3]
+		if query_tokens:
+			keyword_scores: Dict[int, int] = {}
+			for idx, meta in enumerate(self.metadatas):
+				lower_text = meta["text"].lower()
+				match_count = 0
+				for qt in query_tokens:
+					if qt in lower_text:
+						match_count += 1
+				if match_count > 0:
+					keyword_scores[idx] = match_count
+			# If none of the initial embedding results contain any keyword while others do, merge them
+			if keyword_scores:
+				contains_keyword_in_results = any(i in keyword_scores for i in results_map.keys())
+				if not contains_keyword_in_results:
+					# Add top keyword candidates
+					for idx, kw_score in sorted(keyword_scores.items(), key=lambda x: x[1], reverse=True)[:top_k]:
+						meta = self.metadatas[idx]
+						results_map[idx] = {
+							"score": float(0.1 * kw_score),  # small base score; will re-rank below
+							"text": meta["text"],
+							"source": meta["source"],
+							"chunk_id": meta["chunk_id"],
+						}
+			else:
+				# Boost existing results that match keywords
+				for idx, kw_score in keyword_scores.items():
+					if idx in results_map:
+						results_map[idx]["score"] += 0.05 * kw_score
+
+		# Return top_k after potential keyword merge
+		final = sorted(results_map.values(), key=lambda r: r["score"], reverse=True)[:top_k]
+		return final

@@ -29,36 +29,53 @@ Dynamic: license-file
 
 </div>
 
-KORA is a UV-based local RAG application that uses Docling for document ingestion, FAISS for vector search, and Ollama to chat with the IBM Granite 3.3:2b model. Documents are read from the `RAG/` folder and topK relevant chunks are provided as context for each query.
+KORA is a full-stack local RAG application that uses [Docling](https://github.com/docling-project/docling) for document ingestion, [FAISS](https://github.com/facebookresearch/faiss) for vector search, and [Ollama](https://ollama.com/) to chat with the [IBM Granite](https://www.ibm.com/granite) 3.3:2b model. 
+
+Documents are read from the `RAG/` folder and topK relevant chunks are provided as context for each query. All processing is done locally, ensuring data privacy.
+
+This tool was created for `CEE 4803 - Art & Generative AI` at the [Georgia Institute of Technology.](https://www.gatech.edu/)
 
 ## Requirements
-- macOS with Python 3.10+
-- UV (venv already created as per instructions)
-- Ollama installed and `granite3.3:2b` model already pulled
+- Python 3.10+ (uses UV for dependency management)
+- Ollama installed and running on port `11434` (default)
+    - ⚠️ To install Ollama, follow instructions at: https://ollama.com/download
 
 ## Quickstart
 ```bash
-# From project root
+# Clone repo
+git clone https://github.com/Fedele-AI/KORA.git
+# Change directory
+cd KORA
+```
+
+```bash
+# From project root, install dependencies and package
 uv pip install -e .
-# Launch (macOS/Linux)
+```
+
+Launch Kora on macOS/Linux:
+```bash
 ./launch_kora.sh
 ```
 
 For Windows (PowerShell or cmd):
-```bat
+```bash
 launch_kora.bat
 ```
 
 This will:
 - Ensure dependencies are installed
 - Create `RAG/` if missing
-- Build the FAISS index on startup
-- Launch a Gradio web UI at http://127.0.0.1:7860
+- Build the FAISS index on startup (may take a few minutes, this is normal)
+- Launch the Web UI at http://localhost:7860
+
+---
 
 ## Usage
-- Drop PDFs/DOCX/TXT into `RAG/`
+- Drop PDFs/DOCX/TXT into `RAG/` folder.
+- The index auto-builds on first run. Subsequent runs use the existing index.
 - Use the UI to control topK and ask questions. The app retrieves topK chunks and queries Ollama `granite3.3:2b`.
-- Click “Rebuild Index” after adding/removing files. A green notice confirms rebuild.
+- Click “Rebuild Index” after adding or removing files from `RAG/`. A green notice will appear confirming the rebuild.
 
 ## Architecture
 ```mermaid

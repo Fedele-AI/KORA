@@ -4,11 +4,13 @@ from docling.document_converter import DocumentConverter
 
 
 def list_files_in_directory(directory: str) -> List[str]:
-	return [
-		os.path.join(directory, f)
-		for f in os.listdir(directory)
-		if not f.startswith(".") and os.path.isfile(os.path.join(directory, f))
-	]
+	files = []
+	for root, dirs, filenames in os.walk(directory):
+		for filename in filenames:
+			if not filename.startswith("."):
+				full_path = os.path.join(root, filename)
+				files.append(full_path)
+	return files
 
 
 def convert_files_to_markdown(file_paths: List[str]) -> List[Tuple[str, str]]:
@@ -16,9 +18,16 @@ def convert_files_to_markdown(file_paths: List[str]) -> List[Tuple[str, str]]:
 	results: List[Tuple[str, str]] = []
 	for path in file_paths:
 		try:
-			res = converter.convert(path)
-			md = res.document.export_to_markdown()
-			results.append((path, md))
+			# Handle markdown files directly
+			if path.lower().endswith('.md'):
+				with open(path, 'r', encoding='utf-8') as f:
+					md_content = f.read()
+				results.append((path, md_content))
+			else:
+				# Use docling for other file types (PDFs, etc.)
+				res = converter.convert(path)
+				md = res.document.export_to_markdown()
+				results.append((path, md))
 		except Exception as exc:
 			# Skip file on failure but continue
 			print(f"[ingest] Failed to convert {path}: {exc}")

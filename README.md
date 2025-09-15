@@ -44,8 +44,8 @@ launch_kora.bat
 This will:
 - Ensure dependencies are installed
 - Create `RAG/` if missing
-- Build the FAISS index on startup
-- Launch a Gradio web UI at http://127.0.0.1:7860
+- Build the FAISS index on startup (may take a few minutes, this is normal)
+- Launch the Web UI at http://localhost:7860
 
 ---
 

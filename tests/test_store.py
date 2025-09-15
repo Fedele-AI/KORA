@@ -15,3 +15,18 @@ def test_build_and_search_with_tfidf(tmp_path):
 	results = store.search("quick fox", top_k=2)
 	assert len(results) == 2
 	assert any("fox" in r["text"].lower() for r in results)
+
+
+def test_keyword_boost_fallback(tmp_path):
+	index_dir = tmp_path / ".kora_index2"
+	store = VectorStore(index_dir=str(index_dir), backend=TfidfBackend())
+	chunks = [
+		("doc1", "This chunk talks about ordinary topics.", "c0"),
+		("doc2", "Richard Stallman provocatively calls some systems bullshit generators.", "c1"),
+		("doc3", "Another unrelated piece of text.", "c2"),
+	]
+	store.build(chunks)
+	# Query uses a rare term that should match doc2 via keyword even if embedding imperfect
+	results = store.search("Which systems are described as bullshit generators?", top_k=3)
+	texts = "\n".join(r["text"].lower() for r in results)
+	assert "bullshit generators" in texts
