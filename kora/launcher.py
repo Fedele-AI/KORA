@@ -31,6 +31,11 @@ def main() -> None:
 	except Exception:
 		pass
 
+	print("[KORA] Starting web interface with authentication...")
+	print("[KORA] Authentication: Use KORA credentials or API key")
+	print("[KORA] For API key management, use: kora-auth")
+	print("[KORA] For API server, use: kora-api")
+
 	# Launch UI
 	demo = build_interface()
 	demo.launch(server_name="127.0.0.1", server_port=7860, share=False)

@@ -1,21 +1,85 @@
 import gradio as gr
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+import time
 
 from .rag import answer_question, rebuild_index, build_or_load_index
+from .auth import get_authenticator
 
 
 HARD_CODED_MODEL = "granite3.3:2b"
 
 
-def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int) -> List[Dict[str, str]]:
+def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, session_token: str) -> List[Dict[str, str]]:
+	"""Process chatbot response with authentication check."""
+	auth = get_authenticator()
+	
+	# Validate session
+	if not session_token or not auth.validate_session(session_token):
+		history = history + [
+			{"role": "user", "content": message},
+			{"role": "assistant", "content": "❌ Authentication required. Please provide a valid API key."},
+		]
+		return history
+	
 	res = answer_question(query=message, top_k=top_k, model=HARD_CODED_MODEL)
 	answer = res["answer"]
+	
+	# Get username for logging
+	username = auth.get_user_from_session(session_token)
+	if username:
+		print(f"[KORA] Query from {username}: {message[:50]}...")
+	
 	# Do not print context sources in the UI
 	history = history + [
 		{"role": "user", "content": message},
 		{"role": "assistant", "content": answer},
 	]
 	return history
+
+
+def _authenticate_user(username: str, password: str) -> tuple[str, str, str]:
+	"""Authenticate user and return status, message, and session token."""
+	if not username or not password:
+		return "❌ Authentication Failed", "Please provide both username and password.", ""
+	
+	auth = get_authenticator()
+	
+	# Generate API key using Kerberos
+	api_key = auth.generate_api_key(username, password)
+	
+	if not api_key:
+		return "❌ Authentication Failed", "Invalid credentials or Kerberos authentication failed.", ""
+	
+	# Create session
+	session_token = auth.create_session(api_key)
+	
+	if not session_token:
+		return "❌ Authentication Failed", "Failed to create session.", ""
+	
+	return "✅ Authentication Successful", f"Welcome, {username}! Your API key: {api_key}", session_token
+
+
+def _authenticate_with_api_key(api_key: str) -> tuple[str, str, str]:
+	"""Authenticate using API key and return status, message, and session token."""
+	if not api_key or len(api_key) != 64:
+		return "❌ Authentication Failed", "Please provide a valid 64-character API key.", ""
+	
+	auth = get_authenticator()
+	
+	if not auth.validate_api_key(api_key):
+		return "❌ Authentication Failed", "Invalid or expired API key.", ""
+	
+	# Create session
+	session_token = auth.create_session(api_key)
+	
+	if not session_token:
+		return "❌ Authentication Failed", "Failed to create session.", ""
+	
+	# Get username for display
+	api_keys = auth._load_api_keys()
+	username = api_keys.get(api_key, {}).get("username", "Unknown")
+	
+	return "✅ Authentication Successful", f"Welcome back, {username}!", session_token
 
 
 def build_interface() -> gr.Blocks:
@@ -32,28 +96,112 @@ def build_interface() -> gr.Blocks:
 		Designed by researchers at [Georgia Tech](https://gatech.edu).
 
 		Uses Docling + FAISS to retrieve content files, queries Ollama on port `granite3.3:2b`.
-		""")
-		with gr.Row():
-			topk = gr.Slider(label="topK", minimum=1, maximum=20, value=8, step=1)
-			rebuild_btn = gr.Button("Rebuild Index")
 		
-		chatbot = gr.Chatbot(height=500, type='messages')
-		msg = gr.Textbox(label="Your question")
-		send = gr.Button("Send")
-
-		def on_send(history: List[Dict[str, str]], message: str, k: int):
+		**Authentication Required**: Provide your KORA credentials or API key to access the system.
+		""")
+		
+		# Session state
+		session_token = gr.State("")
+		
+		# Authentication section
+		with gr.Group():
+			gr.Markdown("### Authentication")
+			
+			with gr.Tab("Login with Credentials"):
+				with gr.Row():
+					username_input = gr.Textbox(label="Username", placeholder="Your KORA username")
+					password_input = gr.Textbox(label="Password", type="password", placeholder="Your KORA password")
+				login_btn = gr.Button("Login", variant="primary")
+				
+			with gr.Tab("Login with API Key"):
+				api_key_input = gr.Textbox(label="API Key", placeholder="Your 64-character API key", max_lines=1)
+				api_login_btn = gr.Button("Login with API Key", variant="primary")
+			
+			auth_status = gr.Markdown("")
+			auth_message = gr.Textbox(label="Authentication Message", visible=False, interactive=False)
+		
+		# Main interface (initially hidden)
+		with gr.Group(visible=False) as main_interface:
+			with gr.Row():
+				topk = gr.Slider(label="topK", minimum=1, maximum=20, value=8, step=1)
+				rebuild_btn = gr.Button("Rebuild Index")
+			
+			chatbot = gr.Chatbot(height=500, type='messages')
+			msg = gr.Textbox(label="Your question")
+			send = gr.Button("Send")
+			
+			status = gr.Markdown(startup_msg)
+		
+		# Authentication handlers
+		def handle_login(username: str, password: str):
+			auth_result, message, token = _authenticate_user(username, password)
+			
+			if token:
+				return (
+					auth_result,
+					gr.update(value=message, visible=True),
+					token,
+					gr.update(visible=True),  # Show main interface
+					"",  # Clear username
+					""   # Clear password
+				)
+			else:
+				return (
+					auth_result,
+					gr.update(value=message, visible=True),
+					"",
+					gr.update(visible=False),  # Keep main interface hidden
+					username,  # Keep username
+					password   # Keep password
+				)
+		
+		def handle_api_login(api_key: str):
+			auth_result, message, token = _authenticate_with_api_key(api_key)
+			
+			if token:
+				return (
+					auth_result,
+					gr.update(value=message, visible=True),
+					token,
+					gr.update(visible=True),  # Show main interface
+					""  # Clear API key
+				)
+			else:
+				return (
+					auth_result,
+					gr.update(value=message, visible=True),
+					"",
+					gr.update(visible=False),  # Keep main interface hidden
+					api_key  # Keep API key
+				)
+		
+		login_btn.click(
+			handle_login,
+			inputs=[username_input, password_input],
+			outputs=[auth_status, auth_message, session_token, main_interface, username_input, password_input]
+		)
+		
+		api_login_btn.click(
+			handle_api_login,
+			inputs=[api_key_input],
+			outputs=[auth_status, auth_message, session_token, main_interface, api_key_input]
+		)
+		
+		# Chat handlers
+		def on_send(history: List[Dict[str, str]], message: str, k: int, token: str):
 			if not message:
-				return history
-			return _chatbot_response(history, message, k)
-
-		send.click(on_send, inputs=[chatbot, msg, topk], outputs=chatbot)
-		msg.submit(on_send, inputs=[chatbot, msg, topk], outputs=chatbot)
+				return history, ""
+			
+			new_history = _chatbot_response(history, message, k, token)
+			return new_history, ""
+		
+		send.click(on_send, inputs=[chatbot, msg, topk, session_token], outputs=[chatbot, msg])
+		msg.submit(on_send, inputs=[chatbot, msg, topk, session_token], outputs=[chatbot, msg])
 
 		def on_rebuild():
 			res = rebuild_index()
 			return f"<span style='color: green;'>Index {res['status']}. Chunks: {res['num_chunks']}</span>"
 
-		status = gr.Markdown(startup_msg)
 		rebuild_btn.click(on_rebuild, outputs=status)
 
 	return demo

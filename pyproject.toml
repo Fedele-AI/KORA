@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "KORA - Knowledge Oriented Retrieval Assistant (UV-based, Ollama + Granite 3.3:2b, Docling RAG)"
 requires-python = ">=3.10"
 readme = "README.md"
-license = "MIT"
+license = "LGPL-3.0"
 authors = [
-  { name = "Alex" }
+  { name = "Kenneth (Alex) Jenkins" }
 ]
 
 dependencies = [
@@ -19,11 +19,18 @@ dependencies = [
   "docling>=2.0.0",
   "python-dotenv>=1.0.1",
   "sentence-transformers>=3.0.1",
+  "cryptography>=41.0.0",
+  "fastapi>=0.104.0",
+  "uvicorn>=0.24.0",
+  "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
 test = [
   "pytest>=8.0.0",
+]
+kerberos = [
+  "pykerberos>=1.2.1",
 ]
 
 [tool.uv]
@@ -31,6 +38,8 @@ index-url = "https://pypi.org/simple"
 
 [project.scripts]
 kora-launch = "kora.launcher:main"
+kora-auth = "kora.auth_cli:main"
+kora-api = "kora.api_launcher:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

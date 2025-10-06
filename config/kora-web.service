@@ -1,0 +1,29 @@
+# Systemd service file for KORA Web Interface
+# Place this file in /etc/systemd/system/kora-web.service
+
+[Unit]
+Description=KORA Knowledge Oriented Retrieval Assistant - Web Interface
+After=network.target
+Wants=kora-api.service
+
+[Service]
+Type=simple
+User=kora  # Replace with appropriate user
+Group=kora  # Replace with appropriate group
+WorkingDirectory=/path/to/kora  # Replace with KORA installation path
+Environment=PATH=/path/to/kora/venv/bin  # Replace with virtual environment path
+ExecStart=/path/to/kora/venv/bin/kora-launch
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/path/to/kora  # Replace with KORA installation path
+
+[Install]
+WantedBy=multi-user.target
