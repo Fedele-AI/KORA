@@ -15,7 +15,7 @@ def test_answer_question_with_injected_store(monkeypatch, tmp_path):
 	store.build(chunks)
 
 	# Mock ollama to avoid external dependency
-	def fake_call(prompt: str, model: str = "granite3.3:2b") -> str:
+	def fake_call(prompt: str, model: str = "granite3.3:2b", temperature: float = 0.7) -> str:
 		return "Test answer"
 
 	monkeypatch.setattr("kora.rag.call_ollama", fake_call)

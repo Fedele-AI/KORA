@@ -1,36 +1,19 @@
 """
-Authentication module for KORA using Kerberos-based API key generation.
+Authentication module for KORA using random API key generation.
 """
 
-import os
 import secrets
-import hashlib
 import json
 import time
-import subprocess
 from typing import Optional, Dict, Any
 from pathlib import Path
 
-try:
-    import kerberos
-    KERBEROS_AVAILABLE = True
-except ImportError:
-    KERBEROS_AVAILABLE = False
-
 
 class KoraAuthenticator:
-    """Handles Kerberos-based authentication and API key generation for KORA."""
+    """Handles API key generation and validation for KORA."""
     
-    def __init__(self, service_name: str = "HTTP", hostname: Optional[str] = None):
-        """
-        Initialize the authenticator.
-        
-        Args:
-            service_name: Kerberos service name (default: HTTP)
-            hostname: Hostname for Kerberos service (default: localhost)
-        """
-        self.service_name = service_name
-        self.hostname = hostname or "localhost"
+    def __init__(self):
+        """Initialize the authenticator."""
         self.api_keys_file = Path(".kora") / "api_keys.json"
         self.sessions_file = Path(".kora") / "sessions.json"
         
@@ -67,93 +50,31 @@ class KoraAuthenticator:
         with open(self.sessions_file, 'w') as f:
             json.dump(sessions, f, indent=2)
     
-    def generate_api_key(self, username: str, password: Optional[str] = None, demo_mode: bool = False) -> Optional[str]:
+    def generate_api_key(self, username: str = "user") -> str:
         """
-        Generate a 64-character API key using Kerberos authentication.
+        Generate a random 64-character API key.
         
         Args:
-            username: Kerberos username
-            password: Kerberos password
-            demo_mode: If True, skip Kerberos validation (for testing)
+            username: Username for the API key (default: "user")
             
         Returns:
-            64-character API key if authentication successful, None otherwise
+            64-character API key
         """
-        try:
-            # Demo mode for testing
-            if demo_mode:
-                print(f"[DEMO MODE] Generating API key for {username}")
-                if not password:
-                    password = "demo_password"
-            else:
-                if not password:
-                    return None
-                    
-                # Try Kerberos authentication if available
-                if KERBEROS_AVAILABLE:
-                    # Authenticate with Kerberos
-                    service_principal = f"{self.service_name}@{self.hostname}"
-                    
-                    # Initialize Kerberos context
-                    result, context = kerberos.authGSSClientInit(service_principal)
-                    if result != kerberos.AUTH_GSS_COMPLETE:
-                        return None
-                    
-                    # Authenticate using username/password
-                    result = kerberos.authGSSClientStep(context, "")
-                    if result == kerberos.AUTH_GSS_CONTINUE:
-                        # For simplicity, we'll use a hash-based approach with username
-                        # In a real implementation, you'd complete the full Kerberos handshake
-                        pass
-                    
-                    # Clean up Kerberos context
-                    kerberos.authGSSClientClean(context)
-                else:
-                    # Fallback: Use kinit command if available
-                    try:
-                        result = subprocess.run(
-                            ["kinit", "-l", "24h", username],
-                            input=password,
-                            text=True,
-                            capture_output=True,
-                            timeout=10
-                        )
-                        if result.returncode != 0:
-                            print(f"Kerberos authentication failed: {result.stderr}")
-                            return None
-                    except (subprocess.TimeoutExpired, FileNotFoundError):
-                        # Kerberos not available, use simple validation
-                        # In production, this should be replaced with proper authentication
-                        if not username or not password:
-                            return None
-            
-            # Generate 64-character API key
-            timestamp = str(time.time())
-            data = f"{username}:{timestamp}:{self.hostname}"
-            hash_input = data.encode('utf-8')
-            
-            # Create a secure hash and extend to 64 characters
-            api_key_base = hashlib.sha256(hash_input).hexdigest()
-            additional_entropy = secrets.token_hex(16)
-            api_key = (api_key_base + additional_entropy)[:64]
-            
-            # Store API key with metadata
-            api_keys = self._load_api_keys()
-            api_keys[api_key] = {
-                "username": username,
-                "created_at": timestamp,
-                "hostname": self.hostname,
-                "active": True,
-                "demo_mode": demo_mode
-            }
-            self._save_api_keys(api_keys)
-            
-            return api_key
-            
-        except Exception as e:
-            if not demo_mode:
-                print(f"Kerberos authentication failed: {e}")
-            return None
+        # Generate a secure random 64-character API key
+        api_key = secrets.token_hex(32)  # 32 bytes = 64 hex characters
+        
+        timestamp = str(time.time())
+        
+        # Store API key with metadata
+        api_keys = self._load_api_keys()
+        api_keys[api_key] = {
+            "username": username,
+            "created_at": timestamp,
+            "active": True
+        }
+        self._save_api_keys(api_keys)
+        
+        return api_key
     
     def validate_api_key(self, api_key: str) -> bool:
         """

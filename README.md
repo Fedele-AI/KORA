@@ -32,9 +32,8 @@ graph TB
         end
         
         subgraph "Authentication"
-            Auth --> Keys[API Keys<br/>64-char secure]
+            Auth --> Keys[API Keys<br/>64-char secure random]
             Auth --> Sessions[Session Tokens<br/>Cookie-based]
-            Auth --> Krb[Kerberos<br/>Optional]
         end
     end
     
@@ -69,18 +68,6 @@ uv sync
 ollama pull granite3.3:2b
 ```
 
-### Optional: Kerberos Support
-
-For production Kerberos authentication:
-
-```bash
-# Install Kerberos dependencies
-uv add pykerberos
-
-# Configure Kerberos (system-specific)
-# Ensure /etc/krb5.conf is properly configured
-```
-
 ## Usage
 
 ### 1. Document Setup
@@ -90,11 +77,11 @@ Place your documents in the `RAG/` directory. KORA supports various formats incl
 ### 2. Authentication Management
 
 ```bash
-# Generate API key for a user (demo mode for testing)
-uv run kora-auth generate username --demo
+# Generate API key for a user
+uv run kora-auth generate --username myusername
 
-# Generate API key with Kerberos (production)
-uv run kora-auth generate username
+# Or use default username
+uv run kora-auth generate
 
 # List all API keys
 uv run kora-auth list
@@ -138,7 +125,7 @@ uv run kora-api
 
 #### Web Interface
 1. Navigate to the web interface
-2. Login with your username/password or API key
+2. Generate a new API key with your username or login with an existing API key
 3. Ask questions about the documents
 4. Use the **Top-K** slider to control the number of context chunks retrieved (1-20)
 5. Use the **Temperature** slider to control response creativity (0.0-2.0)
@@ -150,10 +137,8 @@ uv run kora-api
 
 #### API Access
 ```bash
-# Login and get API key
-curl -X POST http://127.0.0.1:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "user", "password": "pass", "demo_mode": true}'
+# Generate an API key using CLI
+uv run kora-auth generate --username myuser
 
 # Chat with API key
 curl -X POST http://127.0.0.1:8000/chat \

@@ -5,35 +5,19 @@ Command-line interface for KORA API key management.
 
 import argparse
 import sys
-from typing import Optional
 
 from .auth import get_authenticator
 
 
-def generate_api_key(username: str, password: Optional[str] = None, demo_mode: bool = False) -> None:
-    """Generate an API key for a user."""
-    if not password and not demo_mode:
-        import getpass
-        password = getpass.getpass(f"Password for {username}: ")
-    elif demo_mode and not password:
-        password = "demo_password"
-    
+def generate_api_key(username: str = "user") -> None:
+    """Generate a random API key for a user."""
     auth = get_authenticator()
-    api_key = auth.generate_api_key(username, password, demo_mode=demo_mode)
+    api_key = auth.generate_api_key(username)
     
-    if api_key:
-        print(f"✅ API key generated successfully for {username}:")
-        print(f"API Key: {api_key}")
-        if demo_mode:
-            print("\n🧪 DEMO MODE: This key was generated without Kerberos authentication")
-        print("\n🔐 Please save this API key securely. You will need it to access KORA.")
-        print("📋 This API key can be used in the web interface or for programmatic access.")
-    else:
-        print(f"❌ Failed to generate API key for {username}")
-        if not demo_mode:
-            print("Please check your credentials and ensure Kerberos is properly configured.")
-            print("For testing, you can use --demo flag to skip Kerberos authentication.")
-        sys.exit(1)
+    print(f"✅ API key generated successfully for {username}:")
+    print(f"API Key: {api_key}")
+    print("\n🔐 Please save this API key securely. You will need it to access KORA.")
+    print("📋 This API key can be used in the web interface or for programmatic access.")
 
 
 def validate_api_key(api_key: str) -> None:
@@ -102,9 +86,7 @@ def main() -> None:
     
     # Generate API key
     gen_parser = subparsers.add_parser("generate", help="Generate a new API key")
-    gen_parser.add_argument("username", help="Kerberos username")
-    gen_parser.add_argument("--password", help="Password (will prompt if not provided)")
-    gen_parser.add_argument("--demo", action="store_true", help="Demo mode (skip Kerberos authentication)")
+    gen_parser.add_argument("--username", default="user", help="Username for the API key (default: user)")
     
     # Validate API key
     val_parser = subparsers.add_parser("validate", help="Validate an API key")
@@ -125,7 +107,7 @@ def main() -> None:
     
     try:
         if args.command == "generate":
-            generate_api_key(args.username, args.password, getattr(args, 'demo', False))
+            generate_api_key(getattr(args, 'username', 'user'))
         elif args.command == "validate":
             validate_api_key(args.api_key)
         elif args.command == "revoke":
