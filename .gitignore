@@ -41,6 +41,8 @@ models/
 RAG*/
 static/
 templates/
+.password
+*.kpkg
 
 # IDE
 .vscode/

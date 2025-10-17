@@ -9,7 +9,7 @@ from .auth import get_authenticator
 HARD_CODED_MODEL = "granite3.3:2b"
 
 
-def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, session_token: str) -> List[Dict[str, str]]:
+def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, temperature: float, session_token: str) -> List[Dict[str, str]]:
 	"""Process chatbot response with authentication check."""
 	auth = get_authenticator()
 	
@@ -21,7 +21,7 @@ def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, s
 		]
 		return history
 	
-	res = answer_question(query=message, top_k=top_k, model=HARD_CODED_MODEL)
+	res = answer_question(query=message, top_k=top_k, model=HARD_CODED_MODEL, temperature=temperature)
 	answer = res["answer"]
 	
 	# Get username for logging
@@ -86,7 +86,15 @@ def build_interface() -> gr.Blocks:
 	# Try to load existing index first, only build if necessary
 	store, status = build_or_load_index(force_rebuild=False)
 	startup_info = {"status": status, "num_chunks": len(store.metadatas)}
-	status_text = "loaded from disk" if status == "loaded_from_disk" else "built"
+	
+	# Format status message based on load type
+	if status == "loaded_from_kpkg":
+		status_text = "loaded from .kpkg package"
+	elif status == "loaded_from_disk":
+		status_text = "loaded from disk"
+	else:
+		status_text = "built"
+	
 	startup_msg = f"<span style='color: green;'>Index {status_text}. Chunks: {startup_info['num_chunks']}</span>"
 
 	with gr.Blocks(title="KORA: Knowledge oriented retrieval assistant - BETA") as demo:
@@ -123,10 +131,14 @@ def build_interface() -> gr.Blocks:
 		# Main interface (initially hidden)
 		with gr.Group(visible=False) as main_interface:
 			with gr.Row():
-				topk = gr.Slider(label="topK", minimum=1, maximum=20, value=8, step=1)
+				topk = gr.Slider(label="Top-K", minimum=1, maximum=20, value=8, step=1)
+				temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=2.0, value=0.7, step=0.1)
 				rebuild_btn = gr.Button("Rebuild Index")
 			
-			chatbot = gr.Chatbot(height=500, type='messages')
+			chatbot = gr.Chatbot(height=500, type='messages', show_copy_button=True, latex_delimiters=[
+				{"left": "$$", "right": "$$", "display": True},
+				{"left": "$", "right": "$", "display": False}
+			])
 			msg = gr.Textbox(label="Your question")
 			send = gr.Button("Send")
 			
@@ -188,15 +200,15 @@ def build_interface() -> gr.Blocks:
 		)
 		
 		# Chat handlers
-		def on_send(history: List[Dict[str, str]], message: str, k: int, token: str):
+		def on_send(history: List[Dict[str, str]], message: str, k: int, temp: float, token: str):
 			if not message:
 				return history, ""
 			
-			new_history = _chatbot_response(history, message, k, token)
+			new_history = _chatbot_response(history, message, k, temp, token)
 			return new_history, ""
 		
-		send.click(on_send, inputs=[chatbot, msg, topk, session_token], outputs=[chatbot, msg])
-		msg.submit(on_send, inputs=[chatbot, msg, topk, session_token], outputs=[chatbot, msg])
+		send.click(on_send, inputs=[chatbot, msg, topk, temperature, session_token], outputs=[chatbot, msg])
+		msg.submit(on_send, inputs=[chatbot, msg, topk, temperature, session_token], outputs=[chatbot, msg])
 
 		def on_rebuild():
 			res = rebuild_index()

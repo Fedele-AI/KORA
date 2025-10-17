@@ -40,6 +40,7 @@ index-url = "https://pypi.org/simple"
 kora-launch = "kora.launcher:main"
 kora-auth = "kora.auth_cli:main"
 kora-api = "kora.api_launcher:main"
+kora-hide = "kora.obfuscate_cli:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

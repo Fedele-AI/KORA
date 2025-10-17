@@ -30,8 +30,59 @@ def _fingerprint_files(paths: List[str]) -> str:
 	return hashlib.sha256(payload).hexdigest()
 
 
+def _find_kpkg_file() -> Optional[str]:
+	"""Search for .kpkg files in the project directory."""
+	for root, dirs, files in os.walk('.'):
+		# Skip hidden directories and common non-relevant directories
+		dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__']]
+		for file in files:
+			if file.endswith('.kpkg'):
+				return os.path.join(root, file)
+	return None
+
+
+def _load_kpkg_password(kpkg_path: str) -> Optional[str]:
+	"""Load password for .kpkg file from companion .password file or derive from auth."""
+	password_file = kpkg_path + ".password"
+	if os.path.exists(password_file):
+		try:
+			with open(password_file, 'r') as f:
+				return f.read().strip()
+		except Exception:
+			pass
+	
+	# Try to derive from KORA auth system (use a consistent key)
+	# This allows KORA to access packages without additional passwords
+	try:
+		from .auth import get_authenticator
+		auth = get_authenticator()
+		# Use a system-level key derived from the KORA instance
+		system_key = hashlib.sha256(b"KORA_SYSTEM_KEY_V1").hexdigest()
+		return system_key
+	except Exception:
+		pass
+	
+	return None
+
+
 def build_or_load_index(force_rebuild: bool = False, store: Optional[VectorStore] = None) -> Tuple[VectorStore, str]:
 	ensure_dirs()
+	
+	# First, check for .kpkg files if not forcing rebuild
+	if not force_rebuild:
+		kpkg_path = _find_kpkg_file()
+		if kpkg_path:
+			password = _load_kpkg_password(kpkg_path)
+			if password:
+				try:
+					from .obfuscate import ObfuscatedVectorStore
+					obf_store = ObfuscatedVectorStore(kpkg_path, password)
+					if obf_store.load():
+						print(f"[KORA] Loaded from package: {os.path.basename(kpkg_path)}")
+						return obf_store, "loaded_from_kpkg"
+				except Exception as e:
+					print(f"[KORA] Warning: Failed to load .kpkg file: {e}")
+	
 	store = store or VectorStore(index_dir=DEFAULT_DATA_DIR)
 	files = list_files_in_directory(DEFAULT_RAG_DIR)
 	current_fp = _fingerprint_files(files)
@@ -62,9 +113,9 @@ def format_context(results: List[Dict[str, Any]]) -> str:
 	return "\n\n---\n\n".join(formatted)
 
 
-def call_ollama(prompt: str, model: str = "granite3.3:2b") -> str:
+def call_ollama(prompt: str, model: str = "granite3.3:2b", temperature: float = 0.7) -> str:
 	proc = subprocess.run(
-		["ollama", "run", model, prompt],
+		["ollama", "run", model, "--temperature", str(temperature), prompt],
 		capture_output=True,
 		text=True,
 		check=False,
@@ -76,17 +127,20 @@ def call_ollama(prompt: str, model: str = "granite3.3:2b") -> str:
 	return stdout.strip()
 
 
-def answer_question(query: str, top_k: int = 8, model: str = "granite3.3:2b", store: Optional[VectorStore] = None) -> Dict[str, Any]:
+def answer_question(query: str, top_k: int = 8, model: str = "granite3.3:2b", temperature: float = 0.7, store: Optional[VectorStore] = None) -> Dict[str, Any]:
 	store, _ = build_or_load_index(force_rebuild=False, store=store)
 	results = store.search(query=query, top_k=top_k)
 	context_block = format_context(results) if results else ""
 	system = (
-		"You are KORA - the Knowledge Oriented Retrieval Assistant. You are a helpful assistant created by researchers at Georgia Tech to help students with course content. Use ONLY the provided context to answer. If the answer is not in the context, say you don't know. Be concise."
+		"You are KORA - the Knowledge Oriented Retrieval Assistant. You are a helpful assistant created by researchers at Georgia Tech to help students with course content. "
+		"Use ONLY the provided context to answer. If the answer is not in the context, say you don't know. Be concise. "
+		"When using mathematical notation, always use LaTeX format with proper delimiters: use $...$ for inline math and $$...$$ for display math. "
+		"For example: 'The equation is $E = mc^2$' or for display: '$$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$'"
 	)
 	prompt = (
 		f"System: {system}\n\nContext:\n{context_block}\n\nQuestion: {query}\n\nAnswer:"
 	)
-	response = call_ollama(prompt=prompt, model=model)
+	response = call_ollama(prompt=prompt, model=model, temperature=temperature)
 	return {"answer": response, "context": results}
 
 

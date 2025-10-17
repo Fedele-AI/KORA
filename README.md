@@ -5,11 +5,12 @@ KORA is a secure, authenticated RAG (Retrieval-Augmented Generation) chatbot sys
 ## Features
 
 - **Authenticated Access**: Secure user authentication with API key generation
-- **Document Processing**: Advanced document ingestion with obfuscation capabilities
+- **Document Processing**: Advanced document ingestion with protected package (.kpkg) capabilities
 - **RAG Integration**: Semantic search with FAISS vector store and Ollama LLM
 - **Multiple Interfaces**: Web UI and REST API for flexible access
 - **Session Management**: Cookie-based sessions for web interface
 - **Reverse Proxy Ready**: Designed for deployment behind nginx/apache
+- **Enhanced UI**: Copy buttons for responses, LaTeX math rendering, adjustable temperature control
 
 ## Architecture
 
@@ -105,7 +106,20 @@ uv run kora-auth validate <api-key>
 uv run kora-auth revoke <api-key>
 ```
 
-### 3. Starting Services
+### 3. Creating Protected Packages (Optional)
+
+```bash
+# Create a KORA package (.kpkg) from your documents
+uv run kora-hide create --output course_materials.kpkg --save-password
+
+# View package information
+uv run kora-hide info course_materials.kpkg
+
+# Test package with a query
+uv run kora-hide test course_materials.kpkg --password-file course_materials.kpkg.password -q "What is AI?"
+```
+
+### 4. Starting Services
 
 #### Web Interface
 ```bash
@@ -120,12 +134,19 @@ uv run kora-api
 # API docs at http://127.0.0.1:8000/docs
 ```
 
-### 4. Using the System
+### 5. Using the System
 
 #### Web Interface
 1. Navigate to the web interface
 2. Login with your username/password or API key
 3. Ask questions about the documents
+4. Use the **Top-K** slider to control the number of context chunks retrieved (1-20)
+5. Use the **Temperature** slider to control response creativity (0.0-2.0)
+   - Lower values (0.0-0.5): More focused, deterministic responses
+   - Medium values (0.5-1.0): Balanced responses (default: 0.7)
+   - Higher values (1.0-2.0): More creative, diverse responses
+6. Click the **copy button** on any response to copy it to your clipboard
+7. Math equations render automatically using LaTeX (e.g., `$E = mc^2$`)
 
 #### API Access
 ```bash
@@ -141,30 +162,88 @@ curl -X POST http://127.0.0.1:8000/chat \
   -d '{"question": "What is machine learning?", "top_k": 8}'
 ```
 
-## Document Obfuscation
+## Document Protection with KORA Packages (kpkg)
 
-KORA includes advanced document obfuscation capabilities to protect sensitive content while maintaining searchability.
+KORA includes advanced document protection using a custom binary format (.kpkg files). These packages use a dual-layer protection system:
 
-### How It Works
+### Protection Layers
 
-The obfuscation process operates on multiple levels:
+1. **Obfuscation Layer** (Always Active)
+   - Content is XOR-obfuscated using a deterministic pattern
+   - AI can automatically decode this layer without keys
+   - Prevents casual viewing by users opening the file
+   - Fast and lightweight
 
-1. **Content Analysis**: Documents are analyzed to identify sensitive information
-2. **Semantic Preservation**: Key concepts are preserved while masking specifics
-3. **Searchable Encryption**: Content remains searchable but protected
-4. **Access Control**: Different users see different levels of detail
+2. **Encryption Layer** (Optional)
+   - Adds AES encryption via Fernet (symmetric encryption)
+   - Requires a password/key to decompile the package
+   - Protects against determined attackers
+   - Use `--encrypt` flag when creating packages
 
-### Obfuscation Commands
+### Custom KPKG Format
+
+The .kpkg format is a custom binary structure designed for KORA:
+
+```
+[Header: 8 bytes]
+  - Magic: KORA (4 bytes)
+  - Version: 1 byte
+  - Flags: 1 byte (encryption/compression)
+  - Reserved: 2 bytes
+
+[Metadata Section]
+  - Model info, statistics, sources
+  
+[Embeddings Section]
+  - FAISS index (serialized)
+  
+[Content Section]
+  - Text chunks (obfuscated + optional encryption)
+```
+
+### Creating KORA Packages
 
 ```bash
-# Process documents with obfuscation
-uv run python -m kora.obfuscate_cli process --input RAG/ --output RAG_obfuscated/
+# Create obfuscated-only package (AI can read without key)
+uv run kora-hide create --output course_materials.kpkg
 
-# Check obfuscation status
-uv run python -m kora.obfuscate_cli status
+# Create encrypted package (requires key to decompile)
+uv run kora-hide create --output secure_materials.kpkg --encrypt --save-password
 
-# Configure obfuscation levels
-uv run python -m kora.obfuscate_cli config --level medium
+# Create with custom password and anonymize sources
+uv run kora-hide create -o data.kpkg -p mypassword --encrypt --no-include-sources
+
+# View package information
+uv run kora-hide info course_materials.kpkg
+
+# Test package with a query
+uv run kora-hide test course_materials.kpkg --query "What is AI?"
+
+# Test encrypted package (requires password)
+uv run kora-hide test secure_materials.kpkg --password-file secure_materials.kpkg.password -q "What is AI?"
+```
+
+### Using KORA Packages
+
+Place your `.kpkg` file in the project directory and KORA will automatically detect and use it:
+
+- **Obfuscated packages**: AI reads directly without additional passwords
+- **Encrypted packages**: Requires the password from `.kpkg.password` file or manual entry
+- KORA authentication (from `kora-auth`) is always required for system access
+
+```bash
+# Example workflow:
+# 1. Create an obfuscated package (AI-readable)
+uv run kora-hide create --output course_materials.kpkg
+
+# 2. KORA automatically loads the package
+uv run kora-launch
+
+# 3. Users authenticate with their KORA credentials
+uv run kora-auth generate student_name --demo
+
+# For sensitive data, use encryption:
+uv run kora-hide create --output sensitive_data.kpkg --encrypt --save-password
 ```
 
 ## Authentication System
@@ -282,46 +361,6 @@ graph TB
 - **`kora/obfuscate_cli.py`**: Command-line interface for obfuscation operations
 - **`kora/rag_obfuscated.py`**: RAG pipeline specialized for obfuscated documents
 
-### Configuration
-
-- **`config/nginx-kora.conf`**: Nginx reverse proxy configuration
-- **`config/kora-web.service`**: Systemd service for web interface
-- **`config/kora-api.service`**: Systemd service for API server
-
-## Deployment
-
-### Development
-
-```bash
-# Start web interface
-uv run kora-launch
-
-# Start API server (separate terminal)
-uv run kora-api
-```
-
-### Production with Reverse Proxy
-
-1. **Install and configure nginx**:
-   ```bash
-   sudo cp config/nginx-kora.conf /etc/nginx/sites-available/kora
-   sudo ln -s /etc/nginx/sites-available/kora /etc/nginx/sites-enabled/
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
-
-2. **Install systemd services**:
-   ```bash
-   sudo cp config/kora-*.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable kora-web kora-api
-   sudo systemctl start kora-web kora-api
-   ```
-
-3. **Configure Kerberos** (production):
-   - Set up proper `/etc/krb5.conf`
-   - Configure service principals
-   - Test with `kinit username`
-
 ## API Endpoints
 
 - `GET /health` - Health check
@@ -346,6 +385,45 @@ uv run kora-api
 2. Create a feature branch
 3. Make changes with tests
 4. Submit a pull request
+
+## Technical Details
+
+### KPKG Binary Format Specification
+
+The .kpkg format uses a custom binary structure for optimal performance and security:
+
+**Header Structure (8 bytes)**:
+- Magic number: "KORA" (0x4B4F5241)
+- Version byte: Currently 1
+- Flags byte: Bit 0 (encryption), Bit 1 (compression)
+- Reserved: 2 bytes for future use
+
+**Data Sections**:
+Each section has a 4-byte length prefix (uint32, little-endian) followed by data:
+1. **Metadata**: JSON with package info, model name, chunk metadata, hash
+2. **Embeddings**: Serialized FAISS index for vector search
+3. **Content**: Text chunks (always XOR-obfuscated, optionally encrypted)
+
+**Security Layers**:
+- **XOR Obfuscation** (always active): Simple deterministic XOR with key `KORA_OBFUSCATION_KEY_V1`
+- **AES-256 Encryption** (optional): Fernet cipher with PBKDF2 key derivation (100,000 iterations)
+- **Compression**: zlib compression for reduced file size
+
+**File Size**: Typical compression ratios of 50-70% reduction compared to raw documents.
+
+### Recent Updates
+
+**v0.1.0 - October 2024**
+- Renamed `kora.obfuscate` → `kora-hide` for consistency
+- Changed file extension from `.bin` → `.kpkg`
+- Implemented custom binary format with dual-layer protection
+- Added UI enhancements:
+  - Copy button for all LLM responses
+  - LaTeX math rendering support (`$...$` and `$$...$$`)
+  - Temperature slider (0.0-2.0) for response control
+- Auto-loading of .kpkg files in project directory
+- Updated system prompt for better math formatting
+- Comprehensive documentation updates
 
 ## License
 

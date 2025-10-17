@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Command-line utility for creating and managing obfuscated KORA data packages.
+Command-line utility for creating and managing protected KORA data packages (.kpkg).
 """
 
 import argparse
@@ -9,7 +9,7 @@ import os
 
 
 def create_package(args):
-    """Create obfuscated binary from RAG folder."""
+    """Create obfuscated KPKG from RAG folder."""
     from kora.obfuscate import create_distributable_package
     
     try:
@@ -18,11 +18,12 @@ def create_package(args):
             output_path=args.output,
             password=args.password,
             include_source_names=args.include_sources,
-            force_rebuild=args.force
+            force_rebuild=args.force,
+            use_encryption=args.encrypt
         )
         
-        # Save password to file if requested
-        if args.save_password:
+        # Save password to file if requested and encryption is used
+        if args.save_password and result.get('password'):
             password_file = args.output + ".password"
             with open(password_file, 'w') as f:
                 f.write(result['password'])
@@ -35,7 +36,7 @@ def create_package(args):
 
 
 def test_package(args):
-    """Test querying obfuscated package."""
+    """Test querying KPKG package."""
     from kora.obfuscate import ObfuscatedVectorStore
     
     try:
@@ -45,15 +46,13 @@ def test_package(args):
             with open(args.password_file, 'r') as f:
                 password = f.read().strip()
         
-        if not password:
-            print("Error: Password required (use --password or --password-file)", file=sys.stderr)
-            return 1
-        
-        print(f"Loading obfuscated package: {args.binary}")
+        # Password is optional - only needed for encrypted packages
+        print(f"Loading KPKG package: {args.binary}")
         store = ObfuscatedVectorStore(args.binary, password)
         
         if not store.load():
-            print("Error: Failed to load obfuscated package", file=sys.stderr)
+            print("Error: Failed to load KPKG package", file=sys.stderr)
+            print("  Hint: If package is encrypted, provide password with --password or --password-file", file=sys.stderr)
             return 1
         
         print(f"✓ Loaded successfully!")
@@ -77,23 +76,54 @@ def test_package(args):
 
 
 def info_package(args):
-    """Display information about obfuscated package."""
-    import pickle
+    """Display information about KPKG package."""
+    from kora.obfuscate import KPKGFormat
+    import struct
     
     try:
         with open(args.binary, 'rb') as f:
-            package = pickle.load(f)
+            package_data = f.read()
         
+        # Parse header to get basic info
+        magic = package_data[0:4]
+        if magic != b'KORA':
+            print(f"Error: Invalid KPKG format (magic mismatch)", file=sys.stderr)
+            return 1
+        
+        version = package_data[4]
+        flags = package_data[5]
+        is_encrypted = bool(flags & 0x01)
+        is_compressed = bool(flags & 0x02)
+        
+        # Try to decode metadata (may need password if encrypted)
+        try:
+            metadata, _, _ = KPKGFormat.decode(package_data, decrypt_key=None)
+        except ValueError as e:
+            if "encrypted" in str(e):
+                # Package is encrypted, show limited info
+                print(f"Package Information: {args.binary}")
+                print(f"  Format: KPKG v{version}")
+                print(f"  Encrypted: Yes (password required for full details)")
+                print(f"  Compressed: {'Yes' if is_compressed else 'No'}")
+                print(f"  File Size: {len(package_data) / (1024*1024):.2f} MB")
+                print("\n  Use --password or --password-file to view full details")
+                return 0
+            raise
+        
+        # Display full package information
         print(f"Package Information: {args.binary}")
-        print(f"  Version: {package.get('version', 'unknown')}")
-        print(f"  Embedding Model: {package.get('embedding_model', 'unknown')}")
-        print(f"  Total Chunks: {package.get('num_chunks', 0)}")
-        print(f"  Data Hash: {package.get('hash', 'N/A')}")
-        print(f"  File Size: {os.path.getsize(args.binary) / (1024*1024):.2f} MB")
+        print(f"  Format: KPKG v{metadata.get('version', 'unknown')}")
+        print(f"  Embedding Model: {metadata.get('embedding_model', 'unknown')}")
+        print(f"  Total Chunks: {metadata.get('num_chunks', 0)}")
+        print(f"  Data Hash: {metadata.get('hash', 'N/A')}")
+        print(f"  Encrypted: {'Yes' if metadata.get('encrypted') else 'No'}")
+        print(f"  Compressed: {'Yes' if is_compressed else 'No'}")
+        print(f"  Obfuscated: Yes")
+        print(f"  File Size: {len(package_data) / (1024*1024):.2f} MB")
         
-        # Show unique sources (without decrypting text)
-        if 'metadata' in package:
-            sources = set(m['source'] for m in package['metadata'])
+        # Show unique sources
+        if 'metadata' in metadata:
+            sources = set(m['source'] for m in metadata['metadata'])
             print(f"  Unique Sources: {len(sources)}")
             if not args.no_sources:
                 print("\n  Sources:")
@@ -103,26 +133,31 @@ def info_package(args):
         return 0
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return 1
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="KORA Obfuscation Tool - Create distributable encrypted data packages",
+        description="KORA Hide - Create distributable encrypted KORA packages (.kpkg)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Create obfuscated package from RAG folder
-  python -m kora.obfuscate_cli create --output kora_data.bin --save-password
+  # Create obfuscated-only package (AI can read without key)
+  kora-hide create --output kora_data.kpkg
+  
+  # Create encrypted package (requires key to decompile)
+  kora-hide create --output kora_data.kpkg --encrypt --save-password
   
   # Create with custom password and anonymize sources
-  python -m kora.obfuscate_cli create -o data.bin -p mypassword --no-include-sources
+  kora-hide create -o data.kpkg -p mypassword --encrypt --no-include-sources
   
   # Test the package
-  python -m kora.obfuscate_cli test data.bin --password-file data.bin.password --query "machine learning"
+  kora-hide test data.kpkg --password-file data.kpkg.password --query "machine learning"
   
   # View package info
-  python -m kora.obfuscate_cli info data.bin
+  kora-hide info data.kpkg
         """
     )
     
@@ -132,12 +167,14 @@ Examples:
     create_parser = subparsers.add_parser('create', help='Create obfuscated package')
     create_parser.add_argument('-r', '--rag-dir', default='RAG', 
                               help='Path to RAG folder (default: RAG)')
-    create_parser.add_argument('-o', '--output', default='kora_data.bin',
-                              help='Output binary file (default: kora_data.bin)')
+    create_parser.add_argument('-o', '--output', default='kora_data.kpkg',
+                              help='Output KORA package file (default: kora_data.kpkg)')
     create_parser.add_argument('-p', '--password', 
-                              help='Encryption password (auto-generated if not provided)')
+                              help='Encryption password (only used with --encrypt)')
+    create_parser.add_argument('--encrypt', action='store_true',
+                              help='Add encryption layer (requires key to decompile)')
     create_parser.add_argument('--save-password', action='store_true',
-                              help='Save password to [output].password file')
+                              help='Save password to [output].password file (only for encrypted packages)')
     create_parser.add_argument('--no-include-sources', dest='include_sources', 
                               action='store_false', default=True,
                               help='Anonymize source filenames')
@@ -147,7 +184,7 @@ Examples:
     
     # Test command
     test_parser = subparsers.add_parser('test', help='Test obfuscated package')
-    test_parser.add_argument('binary', help='Path to obfuscated binary file')
+    test_parser.add_argument('binary', help='Path to KORA package file (.kpkg)')
     test_parser.add_argument('-p', '--password', help='Decryption password')
     test_parser.add_argument('--password-file', help='File containing password')
     test_parser.add_argument('-q', '--query', help='Test query to run')
@@ -155,7 +192,7 @@ Examples:
     
     # Info command
     info_parser = subparsers.add_parser('info', help='Show package information')
-    info_parser.add_argument('binary', help='Path to obfuscated binary file')
+    info_parser.add_argument('binary', help='Path to KORA package file (.kpkg)')
     info_parser.add_argument('--no-sources', action='store_true',
                             help='Hide source list')
     info_parser.set_defaults(func=info_package)
