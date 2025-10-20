@@ -114,8 +114,10 @@ def format_context(results: List[Dict[str, Any]]) -> str:
 
 
 def call_ollama(prompt: str, model: str = "granite3.3:2b", temperature: float = 0.7) -> str:
+	# Note: ollama run doesn't support --temperature flag directly via CLI
+	# Temperature control would require using the Ollama API instead
 	proc = subprocess.run(
-		["ollama", "run", model, "--temperature", str(temperature), prompt],
+		["ollama", "run", model, prompt],
 		capture_output=True,
 		text=True,
 		check=False,

@@ -37,25 +37,6 @@ def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, t
 	return history
 
 
-def _authenticate_user(username: str) -> tuple[str, str, str, str]:
-	"""Generate API key for user and return status, message, API key, and session token."""
-	if not username:
-		return "❌ Authentication Failed", "Please provide a username.", "", ""
-	
-	auth = get_authenticator()
-	
-	# Generate random API key
-	api_key = auth.generate_api_key(username)
-	
-	# Create session
-	session_token = auth.create_session(api_key)
-	
-	if not session_token:
-		return "❌ Authentication Failed", "Failed to create session.", "", ""
-	
-	return "✅ Authentication Successful", f"Welcome, {username}!", api_key, session_token
-
-
 def _authenticate_with_api_key(api_key: str) -> tuple[str, str, str]:
 	"""Authenticate using API key and return status, message, and session token."""
 	if not api_key or len(api_key) != 64:
@@ -95,6 +76,9 @@ def build_interface() -> gr.Blocks:
 	startup_msg = f"<span style='color: green;'>Index {status_text}. Chunks: {startup_info['num_chunks']}</span>"
 
 	with gr.Blocks(title="KORA: Knowledge oriented retrieval assistant - BETA") as demo:
+		# Display logo
+		gr.Image(".github/media/KORA_Logo.png", show_label=False, show_download_button=False, container=False, height=150)
+		
 		gr.Markdown("""
 		**KORA: Knowledge oriented retrieval assistant - BETA**
 
@@ -102,7 +86,7 @@ def build_interface() -> gr.Blocks:
 
 		Uses Docling + FAISS to retrieve content files, queries Ollama on port `granite3.3:2b`.
 		
-		**Authentication Required**: Generate an API key with your username or provide an existing API key to access the system.
+		**Authentication Required**: Use `kora-auth` CLI tool to generate an API key, then provide it here to access the system.
 		""")
 		
 		# Session state
@@ -111,15 +95,10 @@ def build_interface() -> gr.Blocks:
 		# Authentication section
 		with gr.Group():
 			gr.Markdown("### Authentication")
+			gr.Markdown("**Note:** Generate API keys using the `kora-auth` command-line tool.")
 			
-			with gr.Tab("Generate New API Key"):
-				username_input = gr.Textbox(label="Username", placeholder="Your username (for identification)")
-				generate_btn = gr.Button("Generate API Key", variant="primary")
-				generated_api_key = gr.Textbox(label="Generated API Key", visible=False, interactive=False, max_lines=1)
-				
-			with gr.Tab("Login with Existing API Key"):
-				api_key_input = gr.Textbox(label="API Key", placeholder="Your 64-character API key", max_lines=1)
-				api_login_btn = gr.Button("Login with API Key", variant="primary")
+			api_key_input = gr.Textbox(label="API Key", placeholder="Your 64-character API key", max_lines=1)
+			api_login_btn = gr.Button("Login with API Key", variant="primary")
 			
 			auth_status = gr.Markdown("")
 			auth_message = gr.Textbox(label="Authentication Message", visible=False, interactive=False)
@@ -141,28 +120,6 @@ def build_interface() -> gr.Blocks:
 			status = gr.Markdown(startup_msg)
 		
 		# Authentication handlers
-		def handle_generate_key(username: str):
-			auth_result, message, api_key, token = _authenticate_user(username)
-			
-			if token:
-				return (
-					auth_result,
-					gr.update(value=message, visible=True),
-					gr.update(value=api_key, visible=True),  # Show generated API key
-					token,
-					gr.update(visible=True),  # Show main interface
-					""  # Clear username
-				)
-			else:
-				return (
-					auth_result,
-					gr.update(value=message, visible=True),
-					gr.update(visible=False),  # Keep API key hidden
-					"",
-					gr.update(visible=False),  # Keep main interface hidden
-					username  # Keep username
-				)
-		
 		def handle_api_login(api_key: str):
 			auth_result, message, token = _authenticate_with_api_key(api_key)
 			
@@ -182,12 +139,6 @@ def build_interface() -> gr.Blocks:
 					gr.update(visible=False),  # Keep main interface hidden
 					api_key  # Keep API key
 				)
-		
-		generate_btn.click(
-			handle_generate_key,
-			inputs=[username_input],
-			outputs=[auth_status, auth_message, generated_api_key, session_token, main_interface, username_input]
-		)
 		
 		api_login_btn.click(
 			handle_api_login,

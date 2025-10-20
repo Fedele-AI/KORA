@@ -1,5 +1,9 @@
 # KORA: Knowledge Oriented Retrieval Assistant
 
+<p align="center">
+  <img src=".github/media/KORA_Logo.png" alt="KORA Logo" width="400"/>
+</p>
+
 KORA is a secure, authenticated RAG (Retrieval-Augmented Generation) chatbot system designed for educational environments. It provides document-based question answering with comprehensive authentication and access control.
 
 ## Features
