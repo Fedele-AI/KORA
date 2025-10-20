@@ -6,15 +6,52 @@
 
 KORA is a secure, authenticated RAG (Retrieval-Augmented Generation) chatbot system designed for educational environments. It provides document-based question answering with comprehensive authentication and access control.
 
+**Designed by researchers at [Georgia Tech](https://gatech.edu)**
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+uv sync
+
+# 2. Install the LLM model
+ollama pull granite3.3:2b
+
+# 3. Generate an API key
+uv run kora-auth generate --username your-name
+
+# 4. Launch the web interface
+uv run kora-launch
+# Visit http://127.0.0.1:7860
+```
+
 ## Features
 
-- **Authenticated Access**: Secure user authentication with API key generation
-- **Document Processing**: Advanced document ingestion with protected package (.kpkg) capabilities
-- **RAG Integration**: Semantic search with FAISS vector store and Ollama LLM
-- **Multiple Interfaces**: Web UI and REST API for flexible access
+### 🔐 Security & Authentication
+- **API Key Management**: Secure 64-character API keys with CLI-based generation
 - **Session Management**: Cookie-based sessions for web interface
-- **Reverse Proxy Ready**: Designed for deployment behind nginx/apache
-- **Enhanced UI**: Copy buttons for responses, LaTeX math rendering, adjustable temperature control
+- **Document Protection**: Custom .kpkg format with optional encryption
+
+### 📚 Document Processing
+- **Advanced Ingestion**: Document processing via Docling (PDF, DOCX, TXT, etc.)
+- **Protected Packages**: .kpkg files with dual-layer obfuscation and encryption
+- **Smart Loading**: Automatic detection and loading of packaged documents
+
+### 🤖 RAG Capabilities
+- **Semantic Search**: FAISS vector store with sentence-transformers embeddings
+- **LLM Integration**: Ollama integration (granite3.3:2b model)
+- **Configurable Retrieval**: Adjustable Top-K and temperature settings
+
+### 🎨 User Experience
+- **Clean Web UI**: Modern Gradio interface with logo and organized layout
+- **LaTeX Support**: Automatic math equation rendering ($...$, $$...$$)
+- **Copy Functionality**: One-click copy for all responses
+- **Network Access**: Available on local network, not just localhost
+
+### 🔧 Developer Friendly
+- **Multiple Interfaces**: Web UI and REST API
+- **Reverse Proxy Ready**: Designed for nginx/apache deployment
+- **CLI Tools**: Command-line utilities for all operations
 
 ## Architecture
 
@@ -112,13 +149,28 @@ uv run kora-hide test course_materials.kpkg --password-file course_materials.kpk
 
 ### 4. Starting Services
 
-#### Web Interface
+#### Web Interface (Recommended)
 ```bash
 uv run kora-launch
-# Access at http://127.0.0.1:7860
 ```
 
-#### REST API Server
+You'll see clean startup output:
+```
+============================================================
+  KORA: Knowledge Oriented Retrieval Assistant
+============================================================
+
+  ➜  Local:   http://127.0.0.1:7860
+  ➜  Network: http://[your-local-ip]:7860
+
+  📝 Authentication: Use kora-auth to generate API keys
+  🔧 API Server:     Use kora-api for REST API access
+  🤖 LLM Model:      granite3.3:2b via Ollama
+
+============================================================
+```
+
+#### REST API Server (Optional)
 ```bash
 uv run kora-api
 # Access at http://127.0.0.1:8000
@@ -128,9 +180,9 @@ uv run kora-api
 ### 5. Using the System
 
 #### Web Interface
-1. Navigate to the web interface
-2. Generate a new API key with your username or login with an existing API key
-3. Ask questions about the documents
+1. Navigate to the web interface at `http://127.0.0.1:7860` or your network URL
+2. Login with an existing API key (generate keys using `kora-auth` CLI tool)
+3. Ask questions about the documents in the chat interface
 4. Use the **Top-K** slider to control the number of context chunks retrieved (1-20)
 5. Use the **Temperature** slider to control response creativity (0.0-2.0)
    - Lower values (0.0-0.5): More focused, deterministic responses
@@ -229,7 +281,7 @@ uv run kora-hide create --output course_materials.kpkg
 uv run kora-launch
 
 # 3. Users authenticate with their KORA credentials
-uv run kora-auth generate student_name --demo
+uv run kora-auth generate student_name
 
 # For sensitive data, use encryption:
 uv run kora-hide create --output sensitive_data.kpkg --encrypt --save-password
@@ -237,29 +289,25 @@ uv run kora-hide create --output sensitive_data.kpkg --encrypt --save-password
 
 ## Authentication System
 
-### Kerberos Implementation
+KORA provides a secure authentication system with API key management and session handling.
 
-KORA uses Kerberos for enterprise authentication:
+### API Key Management
 
-- **Service Principal**: Configured for HTTP service
-- **Ticket Validation**: Full Kerberos ticket validation
-- **Fallback Support**: Command-line kinit fallback
-- **Demo Mode**: Testing without Kerberos infrastructure
+Generate and manage API keys using the `kora-auth` command-line tool:
 
-### Demo Mode vs Production
+```bash
+# Generate API key for a user
+uv run kora-auth generate --username myusername
 
-#### Demo Mode (--demo flag)
-- **Purpose**: Development and testing
-- **Security**: Minimal validation
-- **Usage**: `kora-auth generate user --demo`
-- **Authentication**: Simple username/password check
+# List all API keys
+uv run kora-auth list
 
-#### Production Mode
-- **Purpose**: Enterprise deployment
-- **Security**: Full Kerberos validation
-- **Usage**: `kora-auth generate user`
-- **Authentication**: Kerberos ticket validation
-- **Requirements**: Proper krb5.conf configuration
+# Validate an API key
+uv run kora-auth validate <api-key>
+
+# Revoke an API key
+uv run kora-auth revoke <api-key>
+```
 
 ### API Key Security
 
@@ -275,48 +323,47 @@ KORA uses Kerberos for enterprise authentication:
 graph TB
     subgraph "Entry Points"
         CLI[kora-auth<br/>auth_cli.py]
+        HIDE[kora-hide<br/>obfuscate_cli.py]
         WEB[kora-launch<br/>launcher.py]
         API[kora-api<br/>api_launcher.py]
     end
     
     subgraph "Core Authentication"
-        AUTH[auth.py<br/>KoraAuthenticator]
+        AUTH[auth.py<br/>API Keys & Sessions]
         CLI --> AUTH
         WEB --> AUTH
         API --> AUTH
     end
     
     subgraph "Web Interface"
-        UI[ui.py<br/>Gradio Interface]
+        UI[ui.py<br/>Gradio UI]
         WEB --> UI
         UI --> AUTH
+        UI --> RAG
     end
     
     subgraph "REST API"
-        FASTAPI[api.py<br/>FastAPI Server]
+        FASTAPI[FastAPI Server<br/>api_launcher.py]
         API --> FASTAPI
         FASTAPI --> AUTH
+        FASTAPI --> RAG
     end
     
     subgraph "RAG System"
         RAG[rag.py<br/>RAG Pipeline]
-        STORE[store.py<br/>Vector Store]
-        INGEST[ingest.py<br/>Document Processing]
+        STORE[store.py<br/>FAISS Vector Store]
+        INGEST[ingest.py<br/>Docling Ingestion]
         
-        UI --> RAG
-        FASTAPI --> RAG
         RAG --> STORE
         RAG --> INGEST
+        RAG --> LLM[Ollama LLM<br/>granite3.3:2b]
     end
     
-    subgraph "Document Obfuscation"
-        OBF[obfuscate.py<br/>Obfuscation Engine]
-        OBFCLI[obfuscate_cli.py<br/>CLI Interface]
-        RAGOBF[rag_obfuscated.py<br/>Obfuscated RAG]
-        
-        OBFCLI --> OBF
-        RAGOBF --> OBF
-        RAGOBF --> STORE
+    subgraph "Document Protection"
+        OBF[obfuscate.py<br/>Obfuscation & Encryption]
+        HIDE --> OBF
+        OBF --> KPKG[.kpkg Packages]
+        KPKG --> STORE
     end
     
     subgraph "Data Storage"
@@ -330,15 +377,19 @@ graph TB
         STORE --> INDEX
         INGEST --> DOCS
     end
+    
+    style WEB fill:#e1f5ff
+    style API fill:#e1f5ff
+    style CLI fill:#fff4e1
+    style HIDE fill:#fff4e1
 ```
 
 ### Core Modules
 
-- **`kora/auth.py`**: Central authentication module managing API keys, sessions, and Kerberos integration
+- **`kora/auth.py`**: Central authentication module managing API keys and sessions
 - **`kora/rag.py`**: Main RAG pipeline coordinating document retrieval and LLM interaction
 - **`kora/ui.py`**: Gradio web interface with authentication integration
-- **`kora/api.py`**: FastAPI REST endpoints for programmatic access
-- **`kora/launcher.py`**: Web interface launcher with authentication setup
+- **`kora/launcher.py`**: Web interface launcher with clean startup output
 - **`kora/api_launcher.py`**: API server launcher and configuration
 - **`kora/auth_cli.py`**: Command-line tools for API key management
 
@@ -352,21 +403,24 @@ graph TB
 
 ## API Endpoints
 
-- `GET /health` - Health check
-- `POST /auth/login` - User authentication
-- `POST /auth/session` - Create session from API key
-- `POST /chat` - Chat with API key auth
-- `POST /chat/session` - Chat with session auth
-- `GET /index/status` - Vector store status
+The REST API (accessible via `kora-api` at `http://127.0.0.1:8000`) provides the following endpoints:
+
+- **`GET /health`** - Health check and system status
+- **`POST /chat`** - Submit questions with API key authentication
+  - Header: `Authorization: Bearer <api-key>`
+  - Body: `{"question": "...", "top_k": 8, "temperature": 0.7}`
+- **`GET /index/status`** - Vector store status and statistics
+- **`GET /docs`** - Interactive API documentation (Swagger UI)
 
 ## Security Considerations
 
 - Store API keys securely (`.kora/` directory permissions)
-- Use HTTPS in production
-- Configure proper Kerberos realm
+- Use HTTPS in production with reverse proxy
 - Implement rate limiting at proxy level
 - Regular API key rotation
 - Monitor authentication logs
+- Restrict network access appropriately
+- Use encrypted .kpkg packages for sensitive documents
 
 ## Contributing
 
@@ -400,20 +454,10 @@ Each section has a 4-byte length prefix (uint32, little-endian) followed by data
 
 **File Size**: Typical compression ratios of 50-70% reduction compared to raw documents.
 
-### Recent Updates
-
-**v0.1.0 - October 2024**
-- Renamed `kora.obfuscate` → `kora-hide` for consistency
-- Changed file extension from `.bin` → `.kpkg`
-- Implemented custom binary format with dual-layer protection
-- Added UI enhancements:
-  - Copy button for all LLM responses
-  - LaTeX math rendering support (`$...$` and `$$...$$`)
-  - Temperature slider (0.0-2.0) for response control
-- Auto-loading of .kpkg files in project directory
-- Updated system prompt for better math formatting
-- Comprehensive documentation updates
-
 ## License
 
-LGPL-3.0 - See LICENSE.md for details
+LGPL-3.0 - See [LICENSE.md](LICENSE.md) for details
+
+---
+
+**Built with ❤️ at Georgia Tech**
