@@ -99,7 +99,7 @@ graph TB
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/Fedele-AI/KORA.git
 cd kora
 
 # Install dependencies with UV
