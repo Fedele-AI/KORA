@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Tuple
 
 from .ingest import list_files_in_directory, convert_files_to_markdown, split_markdown_into_chunks
 from .store import VectorStore
+from .config import get_system_prompt_text
 
 
 DEFAULT_RAG_DIR = "RAG"
@@ -133,12 +134,10 @@ def answer_question(query: str, top_k: int = 8, model: str = "granite3.3:2b", te
 	store, _ = build_or_load_index(force_rebuild=False, store=store)
 	results = store.search(query=query, top_k=top_k)
 	context_block = format_context(results) if results else ""
-	system = (
-		"You are KORA - the Knowledge Oriented Retrieval Assistant. You are a helpful assistant created by researchers at Georgia Tech to help students with course content. "
-		"Use ONLY the provided context to answer. If the answer is not in the context, say you don't know. Be concise. "
-		"When using mathematical notation, always use LaTeX format with proper delimiters: use $...$ for inline math and $$...$$ for display math. "
-		"For example: 'The equation is $E = mc^2$' or for display: '$$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$'"
-	)
+	
+	# Get the configured system prompt
+	system = get_system_prompt_text()
+	
 	prompt = (
 		f"System: {system}\n\nContext:\n{context_block}\n\nQuestion: {query}\n\nAnswer:"
 	)

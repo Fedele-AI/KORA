@@ -15,9 +15,7 @@ dependencies = [
   "numpy>=1.26",
   "scikit-learn>=1.4.0",
   "httpx>=0.27.0",
-  "tqdm>=4.66.0",
   "docling>=2.0.0",
-  "python-dotenv>=1.0.1",
   "sentence-transformers>=3.0.1",
   "cryptography>=41.0.0",
   "fastapi>=0.104.0",
@@ -38,6 +36,7 @@ kora-launch = "kora.launcher:main"
 kora-auth = "kora.auth_cli:main"
 kora-api = "kora.api_launcher:main"
 kora-hide = "kora.obfuscate_cli:main"
+kora-admin = "kora.admin_ui:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

@@ -172,7 +172,8 @@ class KoraAuthenticator:
         api_keys = self._load_api_keys()
         
         if api_key in api_keys:
-            api_keys[api_key]["active"] = False
+            # Delete the API key completely
+            del api_keys[api_key]
             self._save_api_keys(api_keys)
             
             # Remove all sessions associated with this API key

@@ -97,7 +97,7 @@ def main() -> None:
     rev_parser.add_argument("api_key", help="API key to revoke")
     
     # List API keys
-    list_parser = subparsers.add_parser("list", help="List all API keys")
+    subparsers.add_parser("list", help="List all API keys")
     
     args = parser.parse_args()
     

@@ -7,7 +7,6 @@ Creates distributable KORA packages (.kpkg) using a custom binary format.
 
 import os
 import json
-import pickle
 import hashlib
 import struct
 import zlib

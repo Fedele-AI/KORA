@@ -50,6 +50,7 @@ uv run kora-launch
 
 ### 🔧 Developer Friendly
 - **Multiple Interfaces**: Web UI and REST API
+- **Admin Panel**: Dedicated admin web GUI for system management
 - **Reverse Proxy Ready**: Designed for nginx/apache deployment
 - **CLI Tools**: Command-line utilities for all operations
 
@@ -109,6 +110,32 @@ uv sync
 ollama pull granite3.3:2b
 ```
 
+## Model Configuration
+
+KORA uses a single LLM model for all users, which can be configured in two ways:
+
+### Option 1: Admin Panel (Recommended)
+
+1. Launch KORA with `uv run kora-launch`
+2. Access the Admin Panel at http://127.0.0.1:7861
+3. Use the admin token from the terminal output
+4. Navigate to the "🤖 AI Settings" tab
+5. Select your desired model from the dropdown and click "Set as Active Model"
+
+### Option 2: Command-Line Flag
+
+Override the model at launch time:
+
+```bash
+# Launch with a specific model
+uv run kora-launch --model qwen2.5:3b
+
+# Launch with any Ollama model
+uv run kora-launch --model llama3.1:8b
+```
+
+**Note:** The model set via command line or admin panel applies to all users. Individual users cannot change the model - this ensures consistent responses and resource management.
+
 ## Usage
 
 ### 1. Document Setup
@@ -160,8 +187,14 @@ You'll see clean startup output:
   KORA: Knowledge Oriented Retrieval Assistant
 ============================================================
 
-  ➜  Local:   http://127.0.0.1:7860
-  ➜  Network: http://[your-local-ip]:7860
+  🌐 Main Interface:
+    ➜  Local:   http://127.0.0.1:7860
+    ➜  Network: http://[your-ip]:7860
+
+  🔐 Admin Panel:
+    ➜  Local:   http://127.0.0.1:7861
+    ➜  Network: http://[your-ip]:7861
+    🔑 Token:   [your-admin-token]
 
   📝 Authentication: Use kora-auth to generate API keys
   🔧 API Server:     Use kora-api for REST API access
@@ -170,6 +203,13 @@ You'll see clean startup output:
 ============================================================
 ```
 
+The admin panel automatically launches alongside the main interface and provides a web GUI for:
+- Managing API keys
+- Creating and managing .kpkg packages
+- Installing and managing Ollama models
+
+**Note:** Save the admin token shown in the terminal - you'll need it to access the admin panel.
+
 #### REST API Server (Optional)
 ```bash
 uv run kora-api
@@ -177,19 +217,99 @@ uv run kora-api
 # API docs at http://127.0.0.1:8000/docs
 ```
 
+#### Admin Panel (Optional - Standalone)
+```bash
+uv run kora-admin
+# Access at http://127.0.0.1:7861
+# Manage API keys, packages, and Ollama models via web GUI
+```
+
+**Note:** The admin panel is automatically launched with `kora-launch`. Use `kora-admin` only if you want to run it separately.
+
 ### 5. Using the System
 
 #### Web Interface
-1. Navigate to the web interface at `http://127.0.0.1:7860` or your network URL
-2. Login with an existing API key (generate keys using `kora-auth` CLI tool)
-3. Ask questions about the documents in the chat interface
-4. Use the **Top-K** slider to control the number of context chunks retrieved (1-20)
-5. Use the **Temperature** slider to control response creativity (0.0-2.0)
-   - Lower values (0.0-0.5): More focused, deterministic responses
-   - Medium values (0.5-1.0): Balanced responses (default: 0.7)
-   - Higher values (1.0-2.0): More creative, diverse responses
-6. Click the **copy button** on any response to copy it to your clipboard
-7. Math equations render automatically using LaTeX (e.g., `$E = mc^2$`)
+
+The KORA web interface provides an intuitive chat-based experience for interacting with your RAG system.
+
+##### Accessing the Interface
+
+After running `uv run kora-launch`, access the web interface at:
+- **Local access:** `http://127.0.0.1:7860`
+- **Network access:** `http://[your-ip]:7860` (accessible from other devices on your network)
+
+##### Authentication
+
+1. When you first visit the interface, you'll see a login screen
+2. Enter an API key generated using `uv run kora-auth generate --username yourname`
+3. The interface uses secure session cookies to keep you logged in
+4. Sessions persist across page refreshes but expire after inactivity
+
+##### Interface Layout
+
+The web interface features:
+
+**Header Section:**
+- KORA logo and branding
+- Current LLM model display (e.g., "🤖 Current LLM Model: `granite3.3:2b` (set by admin)")
+- Clean, modern design
+
+**Chat Interface:**
+- **Question input box:** Enter your questions about the documents
+- **Send button:** Submit your question to the RAG system
+- **Chat history:** Scrollable conversation view with all Q&A pairs
+- **Copy buttons:** Click to copy any response to your clipboard
+
+**Configuration Controls:**
+- **Top-K slider (1-20):** Controls how many relevant document chunks are retrieved
+  - Lower values (1-5): More focused, using fewer sources
+  - Medium values (6-10): Balanced retrieval (default: 8)
+  - Higher values (11-20): Broader context, more comprehensive answers
+- **Temperature slider (0.0-2.0):** Controls LLM response creativity
+  - Lower values (0.0-0.5): More focused, deterministic, fact-based responses
+  - Medium values (0.5-1.0): Balanced responses (default: 0.7)
+  - Higher values (1.0-2.0): More creative, diverse, exploratory responses
+
+##### Features
+
+**LaTeX Math Rendering:**
+- Inline equations: Use `$...$` syntax (e.g., `$E = mc^2$`)
+- Block equations: Use `$$...$$` syntax for centered equations
+- Automatic rendering in all responses
+
+**Response Copying:**
+- Every response has a copy button (📋)
+- One-click copying to clipboard
+- Useful for saving answers or pasting into documents
+
+**Network Accessibility:**
+- Interface is accessible from any device on your local network
+- Share the network URL with students/users on the same network
+- No additional configuration needed for LAN access
+
+**Model Information:**
+- Current model is displayed at the top of the interface
+- Model applies to all users (no per-user model selection)
+- Only admins can change the active model via Admin Panel or CLI flag
+
+##### Using the Interface
+
+1. **Login** with your API key
+2. **Type your question** in the input box (e.g., "What is machine learning?")
+3. **Adjust settings** if needed:
+   - Increase Top-K for more comprehensive answers
+   - Adjust Temperature for more creative or focused responses
+4. **Click Send** or press Enter
+5. **View the response** with relevant source citations
+6. **Copy responses** using the copy button if needed
+7. **Ask follow-up questions** - the system retrieves fresh context for each query
+
+**Tips:**
+- Start with default settings (Top-K: 8, Temperature: 0.7) for balanced results
+- For technical/factual questions, use lower temperature (0.3-0.5)
+- For brainstorming or creative questions, use higher temperature (1.0-1.5)
+- Increase Top-K if answers seem to miss relevant information
+- Check the current model displayed at the top to know which LLM is responding
 
 #### API Access
 ```bash
@@ -317,6 +437,57 @@ uv run kora-auth revoke <api-key>
 - **Validation**: Cryptographic verification
 - **Expiration**: Configurable timeouts
 
+## Admin Panel
+
+KORA includes a dedicated web-based admin panel that provides a graphical interface for system management. The admin panel is automatically launched with `kora-launch` on port 7861.
+
+### Features
+
+The admin panel provides three main sections:
+
+#### 🔑 API Key Management
+- View all generated API keys with user information
+- Generate new API keys for users
+- Revoke existing API keys
+- All operations available via web GUI (no CLI needed)
+
+#### 📦 KORA Package Management
+- List all .kpkg packages in the project directory
+- View package information (size, modification date)
+- Create new packages from the RAG/ directory
+- Configure encryption settings
+- Auto-generate or specify custom passwords
+
+#### 🤖 Ollama Model Management
+- Check Ollama installation and running status
+- List all installed Ollama models
+- Pull the default granite3.3:2b model with one click
+- Pull custom models by name
+- View model pull progress and status
+
+### Security
+
+The admin panel requires an **admin token** for authentication. This token:
+- Is randomly generated on each launch
+- Is printed in the terminal when `kora-launch` starts
+- Must be entered in the admin panel to access any features
+- Provides full administrative access to KORA
+
+**Important:** Keep the admin token secure and do not share it. Anyone with the token has full administrative access.
+
+### Access
+
+When you run `kora-launch`, the admin panel is automatically started:
+- **Local:** `http://127.0.0.1:7861`
+- **Network:** `http://[your-ip]:7861`
+
+You can also run the admin panel standalone:
+```bash
+uv run kora-admin
+```
+
+The admin token will be displayed in the terminal output.
+
 ## File Structure and Module Interactions
 
 ```mermaid
@@ -325,14 +496,17 @@ graph TB
         CLI[kora-auth<br/>auth_cli.py]
         HIDE[kora-hide<br/>obfuscate_cli.py]
         WEB[kora-launch<br/>launcher.py]
-        API[kora-api<br/>api_launcher.py]
+        APICLI[kora-api<br/>api_launcher.py]
+        ADMIN[kora-admin<br/>admin_ui.py]
     end
     
-    subgraph "Core Authentication"
+    subgraph "Core Modules"
         AUTH[auth.py<br/>API Keys & Sessions]
+        CONFIG[config.py<br/>Settings & Prompts]
         CLI --> AUTH
         WEB --> AUTH
-        API --> AUTH
+        APICLI --> AUTH
+        ADMIN --> AUTH
     end
     
     subgraph "Web Interface"
@@ -340,13 +514,27 @@ graph TB
         WEB --> UI
         UI --> AUTH
         UI --> RAG
+        UI --> CONFIG
+    end
+    
+    subgraph "Admin Panel"
+        ADMINUI[admin_ui.py<br/>Admin Web GUI]
+        WEB --> ADMINUI
+        ADMIN --> ADMINUI
+        ADMINUI --> AUTH
+        ADMINUI --> OBF
+        ADMINUI --> CONFIG
+        ADMINUI --> OLLAMA[Ollama CLI]
     end
     
     subgraph "REST API"
-        FASTAPI[FastAPI Server<br/>api_launcher.py]
-        API --> FASTAPI
+        FASTAPI[api.py<br/>FastAPI Server]
+        APILAUNCHER[api_launcher.py<br/>API Launcher]
+        APICLI --> APILAUNCHER
+        APILAUNCHER --> FASTAPI
         FASTAPI --> AUTH
         FASTAPI --> RAG
+        FASTAPI --> CONFIG
     end
     
     subgraph "RAG System"
@@ -356,40 +544,50 @@ graph TB
         
         RAG --> STORE
         RAG --> INGEST
+        RAG --> CONFIG
         RAG --> LLM[Ollama LLM<br/>granite3.3:2b]
     end
     
     subgraph "Document Protection"
         OBF[obfuscate.py<br/>Obfuscation & Encryption]
+        RAGOBF[rag_obfuscated.py<br/>Obfuscated RAG]
         HIDE --> OBF
         OBF --> KPKG[.kpkg Packages]
+        RAGOBF --> OBF
+        RAGOBF --> CONFIG
         KPKG --> STORE
     end
     
     subgraph "Data Storage"
         APIKEYS[.kora/api_keys.json]
         SESSIONS[.kora/sessions.json]
+        CFGFILE[.kora/config.json]
         INDEX[.kora/index/]
         DOCS[RAG/]
         
         AUTH --> APIKEYS
         AUTH --> SESSIONS
+        CONFIG --> CFGFILE
         STORE --> INDEX
         INGEST --> DOCS
     end
     
     style WEB fill:#e1f5ff
-    style API fill:#e1f5ff
+    style APICLI fill:#e1f5ff
     style CLI fill:#fff4e1
     style HIDE fill:#fff4e1
+    style ADMIN fill:#ffe1e1
 ```
 
 ### Core Modules
 
 - **`kora/auth.py`**: Central authentication module managing API keys and sessions
+- **`kora/config.py`**: Configuration management for models, prompts, and system settings
 - **`kora/rag.py`**: Main RAG pipeline coordinating document retrieval and LLM interaction
 - **`kora/ui.py`**: Gradio web interface with authentication integration
-- **`kora/launcher.py`**: Web interface launcher with clean startup output
+- **`kora/admin_ui.py`**: Admin panel web GUI for system management
+- **`kora/launcher.py`**: Web interface launcher with clean startup output and admin panel
+- **`kora/api.py`**: FastAPI REST API server with endpoints for querying and management
 - **`kora/api_launcher.py`**: API server launcher and configuration
 - **`kora/auth_cli.py`**: Command-line tools for API key management
 
@@ -405,21 +603,38 @@ graph TB
 
 The REST API (accessible via `kora-api` at `http://127.0.0.1:8000`) provides the following endpoints:
 
-- **`GET /health`** - Health check and system status
-- **`POST /chat`** - Submit questions with API key authentication
-  - Header: `Authorization: Bearer <api-key>`
-  - Body: `{"question": "...", "top_k": 8, "temperature": 0.7}`
-- **`GET /index/status`** - Vector store status and statistics
+**General:**
+- **`GET /`** - API information and version
+- **`GET /health`** - Health check
+- **`GET /status`** - System status, index statistics, and configuration (requires API key)
+  - Header: `X-API-Key: <api-key>`
+
+**RAG Operations:**
+- **`POST /query`** - Submit questions and get AI-generated answers (requires API key)
+  - Header: `X-API-Key: <api-key>`
+  - Body: `{"question": "...", "top_k": 8, "model": "granite3.3:2b", "temperature": 0.7}`
+- **`POST /search`** - Search for relevant context without generating an answer (requires API key)
+  - Header: `X-API-Key: <api-key>`
+  - Body: `{"query": "...", "top_k": 8}`
+
+**Management:**
+- **`POST /rebuild`** - Rebuild the vector index from documents (requires API key)
+  - Header: `X-API-Key: <api-key>`
+  - Body: `{"force": false}`
+
+**Documentation:**
 - **`GET /docs`** - Interactive API documentation (Swagger UI)
+- **`GET /redoc`** - Alternative API documentation (ReDoc)
 
 ## Security Considerations
 
+- **Admin Token**: Keep the admin token secure - it provides full administrative access
 - Store API keys securely (`.kora/` directory permissions)
 - Use HTTPS in production with reverse proxy
 - Implement rate limiting at proxy level
 - Regular API key rotation
 - Monitor authentication logs
-- Restrict network access appropriately
+- Restrict network access appropriately (especially for admin panel)
 - Use encrypted .kpkg packages for sensitive documents
 
 ## Contributing
@@ -453,6 +668,41 @@ Each section has a 4-byte length prefix (uint32, little-endian) followed by data
 - **Compression**: zlib compression for reduced file size
 
 **File Size**: Typical compression ratios of 50-70% reduction compared to raw documents.
+
+### Recent Updates
+
+**v0.2.1 - October 2025**
+- **Admin Panel**: Added dedicated web-based admin GUI (port 7861)
+  - Manage API keys through web interface
+  - Create and manage .kpkg packages
+  - Install and manage Ollama models
+  - One-click granite3.3:2b model installation
+  - Secure admin token authentication
+- **Improved Launcher**: Admin panel auto-launches with main interface
+- **Enhanced Documentation**: Comprehensive admin panel documentation
+
+**v0.2.0 - October 2025**
+- **UI Improvements**:
+  - Removed API key generation from web interface (now CLI-only)
+  - Added KORA logo to README and web interface
+  - Clean startup banner with local and network URLs
+  - Network access enabled (not just localhost)
+- **Security Enhancements**:
+  - Streamlined authentication flow
+  - API key generation restricted to `kora-auth` CLI tool
+  - Improved session management
+- **Documentation**:
+  - Cleaned up authentication documentation
+  - Updated mermaid diagrams for accuracy
+  - Added Quick Start guide
+  - Reorganized features section with emojis
+
+**v0.1.0 - October 2024**
+- Renamed `kora.obfuscate` → `kora-hide` for consistency
+- Changed file extension from `.bin` → `.kpkg`
+- Implemented custom binary format with dual-layer protection
+- Added UI enhancements (copy button, LaTeX rendering, temperature slider)
+- Auto-loading of .kpkg files in project directory
 
 ## License
 

@@ -4,12 +4,10 @@ import time
 
 from .rag import answer_question, rebuild_index, build_or_load_index
 from .auth import get_authenticator
+from .config import get_default_model, get_default_temperature, get_default_top_k
 
 
-HARD_CODED_MODEL = "granite3.3:2b"
-
-
-def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, temperature: float, session_token: str) -> List[Dict[str, str]]:
+def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, temperature: float, session_token: str, model: str) -> List[Dict[str, str]]:
 	"""Process chatbot response with authentication check."""
 	auth = get_authenticator()
 	
@@ -21,13 +19,13 @@ def _chatbot_response(history: List[Dict[str, str]], message: str, top_k: int, t
 		]
 		return history
 	
-	res = answer_question(query=message, top_k=top_k, model=HARD_CODED_MODEL, temperature=temperature)
+	res = answer_question(query=message, top_k=top_k, model=model, temperature=temperature)
 	answer = res["answer"]
 	
 	# Get username for logging
 	username = auth.get_user_from_session(session_token)
 	if username:
-		print(f"[KORA] Query from {username}: {message[:50]}...")
+		print(f"[KORA] Query from {username} using {model}: {message[:50]}...")
 	
 	# Do not print context sources in the UI
 	history = history + [
@@ -65,6 +63,11 @@ def build_interface() -> gr.Blocks:
 	store, status = build_or_load_index(force_rebuild=False)
 	startup_info = {"status": status, "num_chunks": len(store.metadatas)}
 	
+	# Load default settings from config
+	default_model = get_default_model()
+	default_temperature = get_default_temperature()
+	default_top_k = get_default_top_k()
+	
 	# Format status message based on load type
 	if status == "loaded_from_kpkg":
 		status_text = "loaded from .kpkg package"
@@ -84,7 +87,7 @@ def build_interface() -> gr.Blocks:
 
 		Designed by researchers at [Georgia Tech](https://gatech.edu).
 
-		Uses Docling + FAISS to retrieve content files, queries Ollama on port `granite3.3:2b`.
+		Uses Docling + FAISS to retrieve content, queries Ollama with your selected model.
 		
 		**Authentication Required**: Use `kora-auth` CLI tool to generate an API key, then provide it here to access the system.
 		""")
@@ -106,8 +109,11 @@ def build_interface() -> gr.Blocks:
 		# Main interface (initially hidden)
 		with gr.Group(visible=False) as main_interface:
 			with gr.Row():
-				topk = gr.Slider(label="Top-K", minimum=1, maximum=20, value=8, step=1)
-				temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=2.0, value=0.7, step=0.1)
+				topk = gr.Slider(label="Top-K", minimum=1, maximum=20, value=default_top_k, step=1)
+				temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=2.0, value=default_temperature, step=0.1)
+			
+			with gr.Row():
+				gr.Markdown(f"**🤖 Current LLM Model:** `{default_model}` (set by admin)")
 				rebuild_btn = gr.Button("Rebuild Index")
 			
 			chatbot = gr.Chatbot(height=500, type='messages', show_copy_button=True, latex_delimiters=[
@@ -151,7 +157,9 @@ def build_interface() -> gr.Blocks:
 			if not message:
 				return history, ""
 			
-			new_history = _chatbot_response(history, message, k, temp, token)
+			# Always use the admin-configured default model
+			model = get_default_model()
+			new_history = _chatbot_response(history, message, k, temp, token, model)
 			return new_history, ""
 		
 		send.click(on_send, inputs=[chatbot, msg, topk, temperature, session_token], outputs=[chatbot, msg])
