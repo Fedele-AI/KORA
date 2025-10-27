@@ -6,7 +6,7 @@
 
 KORA is a secure, authenticated RAG (Retrieval-Augmented Generation) chatbot system designed for educational environments. It provides document-based question answering with comprehensive authentication and access control.
 
-**Designed by researchers at [Georgia Tech](https://gatech.edu)**
+**Designed by Kenneth Jenkins at [Georgia Tech](https://gatech.edu)**
 
 ## Quick Start
 
