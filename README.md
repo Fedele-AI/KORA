@@ -90,13 +90,35 @@ graph TB
 
 ## Installation
 
-### Prerequisites
+### Option 1: Docker/Podman (Recommended for Production)
 
+**Quick Start with Docker/Podman:**
+
+```bash
+# Clone the repository
+git clone https://github.com/Fedele-AI/KORA.git
+cd kora
+
+# Build the image
+./docker-build.fish
+
+# Run the container
+./docker-run.fish
+
+# Generate API key
+./docker-run.fish --service=auth -- generate --username admin
+```
+
+**See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.**
+
+### Option 2: Local Development with UV
+
+**Prerequisites:**
 - Python 3.10+
 - UV package manager
 - Ollama with granite3.3:2b model
 
-### Install KORA
+**Install KORA:**
 
 ```bash
 # Clone the repository
@@ -176,7 +198,27 @@ uv run kora-hide test course_materials.kpkg --password-file course_materials.kpk
 
 ### 4. Starting Services
 
-#### Web Interface (Recommended)
+#### Docker/Podman Deployment
+
+```bash
+# Using Fish scripts (recommended)
+./docker-run.fish                    # Web interface
+./docker-run.fish --service=api      # API server
+./docker-run.fish --gpu              # With GPU support
+
+# Using docker-compose
+docker-compose up -d                 # All services
+docker-compose logs -f kora-web      # View logs
+
+# Generate API key in container
+./docker-run.fish --service=auth -- generate --username admin
+```
+
+**See [DOCKER.md](DOCKER.md) for complete deployment guide.**
+
+#### Local Development (UV)
+
+**Web Interface (Recommended):**
 ```bash
 uv run kora-launch
 ```

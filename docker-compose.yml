@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database (optional - comment out to use SQLite)
+  postgres:
+    image: postgres:16-alpine
+    container_name: kora-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-kora}
+      - POSTGRES_USER=${POSTGRES_USER:-kora}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-kora_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    networks:
+      - kora-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kora}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kora-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kora:latest
+    container_name: kora-web
+    command: web
+    ports:
+      - "7860:7860"  # Main web interface
+      - "7861:7861"  # Admin panel
+    volumes:
+      - kora-data:/data
+      - ./RAG:/app/RAG:ro  # Mount RAG documents (read-only)
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - KORA_DATA_DIR=/data
+      - KORA_MODEL_DIR=/models
+      # Database config - SQLite by default, PostgreSQL if enabled
+      - DATABASE_URL=${DATABASE_URL:-file:/data/kora.db}
+      - ENABLE_DB_LOGGING=${ENABLE_DB_LOGGING:-true}
+    restart: unless-stopped
+    networks:
+      - kora-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    # For GPU access (requires NVIDIA Container Toolkit)
+    # Uncomment the following lines if you have NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  kora-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kora:latest
+    container_name: kora-api
+    command: api
+    ports:
+      - "8000:8000"  # REST API
+    volumes:
+      - kora-data:/data
+      - ./RAG:/app/RAG:ro
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - KORA_DATA_DIR=/data
+      - KORA_MODEL_DIR=/models
+      - DATABASE_URL=${DATABASE_URL:-file:/data/kora.db}
+      - ENABLE_DB_LOGGING=${ENABLE_DB_LOGGING:-true}
+    restart: unless-stopped
+    networks:
+      - kora-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    # For GPU access (requires NVIDIA Container Toolkit)
+    # Uncomment the following lines if you have NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  kora-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  kora-network:
+    driver: bridge

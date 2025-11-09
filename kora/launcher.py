@@ -63,6 +63,24 @@ def main() -> None:
 		type=str,
 		help='Set the LLM model to use (e.g., granite3.3:2b, qwen2.5:3b). This overrides the admin panel setting.'
 	)
+	parser.add_argument(
+		'--server-name',
+		type=str,
+		default='0.0.0.0',
+		help='Server name to bind to (default: 0.0.0.0)'
+	)
+	parser.add_argument(
+		'--server-port',
+		type=int,
+		default=7860,
+		help='Main UI port (default: 7860)'
+	)
+	parser.add_argument(
+		'--admin-port',
+		type=int,
+		default=7861,
+		help='Admin UI port (default: 7861)'
+	)
 	args = parser.parse_args()
 	
 	# If model is specified via command line, set it
@@ -78,18 +96,23 @@ def main() -> None:
 	ensure_dirs()
 
 	# Verify Ollama availability (best effort quick check)
-	if not _which("ollama"):
-		print("[KORA] Ollama not found in PATH. Please install Ollama and ensure 'ollama' is available.")
-		sys.exit(1)
+	# Skip if OLLAMA_HOST is set (containerized environment)
+	ollama_host = os.getenv("OLLAMA_HOST")
+	if not ollama_host:
+		if not _which("ollama"):
+			print("[KORA] Ollama not found in PATH. Please install Ollama and ensure 'ollama' is available.")
+			sys.exit(1)
 
-	# Best-effort check for any installed model
-	try:
-		ls_proc = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=False)
-		if not ls_proc.stdout or "NAME" not in ls_proc.stdout:
-			print("[KORA] Warning: No Ollama models found.")
-			print("[KORA] Please install a model. Recommended: ollama pull qwen2.5:3b")
-	except Exception:
-		pass
+		# Best-effort check for any installed model
+		try:
+			ls_proc = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=False)
+			if not ls_proc.stdout or "NAME" not in ls_proc.stdout:
+				print("[KORA] Warning: No Ollama models found.")
+				print("[KORA] Please install a model. Recommended: ollama pull qwen2.5:3b")
+		except Exception:
+			pass
+	else:
+		print(f"[KORA] Using remote Ollama at: {ollama_host}")
 
 	# Launch UI with quiet mode to suppress Gradio's default output
 	demo = build_interface()
@@ -99,13 +122,13 @@ def main() -> None:
 	admin_token = get_admin_token()
 	
 	# Print our custom banner
-	_print_startup_banner(7860, 7861, admin_token)
+	_print_startup_banner(args.server_port, args.admin_port, admin_token)
 	
 	# Launch admin panel in background thread
 	def launch_admin():
 		admin_demo.launch(
-			server_name="0.0.0.0",
-			server_port=7861,
+			server_name=args.server_name,
+			server_port=args.admin_port,
 			share=False,
 			quiet=True,
 			show_api=False,
@@ -117,8 +140,8 @@ def main() -> None:
 	
 	# Launch main UI (this will block)
 	demo.launch(
-		server_name="0.0.0.0",
-		server_port=7860,
+		server_name=args.server_name,
+		server_port=args.server_port,
 		share=False,
 		quiet=True,
 		show_api=False

@@ -1290,6 +1290,194 @@ def build_admin_interface() -> gr.Blocks:
 						outputs=[revoke_output]
 					)
 				
+				# ===== Conversation Logs Tab =====
+				with gr.Tab("💬 Conversation Logs"):
+					gr.Markdown("""
+					### User-AI Conversation History
+					View all conversations between users and the AI assistant. 
+					Browse sessions, view message history, and export logs.
+					""")
+					
+					with gr.Row():
+						with gr.Column(scale=2):
+							gr.Markdown("### Recent Sessions")
+							refresh_sessions_btn = gr.Button("🔄 Refresh Sessions", variant="secondary")
+							sessions_limit = gr.Slider(
+								minimum=10,
+								maximum=200,
+								value=50,
+								step=10,
+								label="Number of sessions to load"
+							)
+							sessions_html = gr.HTML()
+						
+						with gr.Column(scale=3):
+							gr.Markdown("### Conversation Details")
+							session_selector = gr.Textbox(
+								label="Session ID",
+								placeholder="Click a session from the list or paste ID here"
+							)
+							load_conversation_btn = gr.Button("📖 Load Conversation", variant="primary")
+							conversation_html = gr.HTML()
+							
+							with gr.Row():
+								export_session_btn = gr.Button("💾 Export Session", variant="secondary")
+								export_output = gr.File(label="Download Export", visible=False)
+					
+					gr.Markdown("---")
+					
+					with gr.Row():
+						gr.Markdown("### Search & Filter")
+						with gr.Column():
+							search_user_id = gr.Textbox(
+								label="Filter by User ID",
+								placeholder="Enter user ID to filter"
+							)
+							search_date_range = gr.Textbox(
+								label="Date Range (optional)",
+								placeholder="YYYY-MM-DD to YYYY-MM-DD"
+							)
+							search_btn = gr.Button("🔍 Search", variant="primary")
+					
+					# Event handlers for conversation logs
+					def load_sessions_list(token, limit):
+						"""Load and display recent sessions"""
+						if not verify_admin_token(token):
+							return "<div style='color: red;'>❌ Invalid admin token</div>"
+						
+						try:
+							import asyncio
+							from .conversation_logger import conversation_logger
+							
+							sessions = asyncio.run(conversation_logger.get_recent_sessions(limit=int(limit)))
+							
+							if not sessions:
+								return "<div style='padding: 20px; text-align: center; color: #999;'>No conversations found</div>"
+							
+							html = "<div style='max-height: 600px; overflow-y: auto;'>"
+							for sess in sessions:
+								start_time = sess['startTime'][:19].replace('T', ' ')
+								title = sess['title'] or "Untitled conversation"
+								user_display = sess['userId'] or "Anonymous"
+								
+								html += f"""
+								<div style='padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; background: white; transition: all 0.2s;' 
+									 onmouseover='this.style.background="#f8f9fa"' 
+									 onmouseout='this.style.background="white"'
+									 onclick='navigator.clipboard.writeText("{sess["id"]}"); this.style.background="#e6f3ff";'>
+									<div style='font-weight: 600; color: #333;'>{title}</div>
+									<div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
+										👤 {user_display} | 📅 {start_time} | 💬 {sess['messageCount']} messages
+									</div>
+									<div style='font-size: 0.8em; color: #999; margin-top: 4px;'>
+										ID: {sess["id"][:16]}... (click to copy)
+									</div>
+								</div>
+								"""
+							html += "</div>"
+							return html
+						except Exception as e:
+							return f"<div style='color: red;'>❌ Error loading sessions: {str(e)}</div>"
+					
+					def load_conversation(token, session_id):
+						"""Load and display conversation messages"""
+						if not verify_admin_token(token):
+							return "<div style='color: red;'>❌ Invalid admin token</div>"
+						
+						if not session_id or not session_id.strip():
+							return "<div style='color: #999;'>Please enter a session ID</div>"
+						
+						try:
+							import asyncio
+							from .conversation_logger import conversation_logger
+							
+							messages = asyncio.run(conversation_logger.get_session_history(session_id.strip()))
+							
+							if not messages:
+								return "<div style='padding: 20px; text-align: center; color: #999;'>No messages found for this session</div>"
+							
+							html = "<div style='max-height: 700px; overflow-y: auto; padding: 10px;'>"
+							
+							for msg in messages:
+								is_user = msg['role'] == 'user'
+								bg_color = "#e3f2fd" if is_user else "#f5f5f5"
+								align = "right" if is_user else "left"
+								icon = "👤" if is_user else "🤖"
+								
+								timestamp = msg['timestamp'][:19].replace('T', ' ')
+								
+								html += f"""
+								<div style='margin: 12px 0; text-align: {align};'>
+									<div style='display: inline-block; max-width: 80%; text-align: left; padding: 12px; background: {bg_color}; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);'>
+										<div style='font-weight: 600; color: #333; margin-bottom: 8px;'>
+											{icon} {msg['role'].title()}
+											<span style='font-size: 0.85em; color: #666; font-weight: normal; margin-left: 8px;'>{timestamp}</span>
+										</div>
+										<div style='color: #333; white-space: pre-wrap; word-wrap: break-word;'>{msg['content']}</div>
+								"""
+								
+								if msg.get('model'):
+									html += f"<div style='font-size: 0.85em; color: #666; margin-top: 8px;'>Model: {msg['model']}</div>"
+								
+								if msg.get('latencyMs'):
+									html += f"<div style='font-size: 0.85em; color: #666;'>Latency: {msg['latencyMs']}ms</div>"
+								
+								html += "</div></div>"
+							
+							html += "</div>"
+							return html
+						except Exception as e:
+							return f"<div style='color: red;'>❌ Error loading conversation: {str(e)}</div>"
+					
+					def export_conversation(token, session_id):
+						"""Export conversation to JSON file"""
+						if not verify_admin_token(token):
+							return None
+						
+						if not session_id or not session_id.strip():
+							return None
+						
+						try:
+							import asyncio
+							import json
+							import tempfile
+							from .conversation_logger import conversation_logger
+							
+							messages = asyncio.run(conversation_logger.get_session_history(session_id.strip()))
+							
+							if not messages:
+								return None
+							
+							# Create temporary JSON file
+							with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+								json.dump({
+									'session_id': session_id,
+									'exported_at': datetime.now().isoformat(),
+									'messages': messages
+								}, f, indent=2)
+								return f.name
+						except Exception as e:
+							print(f"Export error: {e}")
+							return None
+					
+					refresh_sessions_btn.click(
+						load_sessions_list,
+						inputs=[admin_token_input, sessions_limit],
+						outputs=[sessions_html]
+					)
+					
+					load_conversation_btn.click(
+						load_conversation,
+						inputs=[admin_token_input, session_selector],
+						outputs=[conversation_html]
+					)
+					
+					export_session_btn.click(
+						export_conversation,
+						inputs=[admin_token_input, session_selector],
+						outputs=[export_output]
+					)
+				
 				# ===== AI Settings Tab =====
 				with gr.Tab("🤖 AI Settings"):
 					gr.Markdown("""

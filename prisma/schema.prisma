@@ -1,0 +1,64 @@
+// Prisma schema for KORA conversation logging
+// Supports SQLite for local development and PostgreSQL for production
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Conversation sessions
+model Session {
+  id          String      @id @default(uuid())
+  userId      String?     // API key or username
+  startTime   DateTime    @default(now())
+  endTime     DateTime?
+  title       String?     // Auto-generated from first user message
+  model       String?     // Default model for session
+  metadata    String?     // JSON string for additional data
+  messages    Message[]
+  
+  @@index([startTime])
+  @@index([userId])
+}
+
+// Individual messages in conversations
+model Message {
+  id          String   @id @default(uuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  role        String   // "user" or "assistant"
+  content     String   // The actual message text
+  model       String?  // AI model used for this response
+  tokensUsed  Int?     // Token count for this message
+  latencyMs   Int?     // Response time in milliseconds
+  metadata    String?  // JSON string for additional context
+  
+  @@index([sessionId])
+  @@index([timestamp])
+  @@index([role])
+}
+
+// Document ingestion logs
+model IngestionLog {
+  id           String   @id @default(uuid())
+  timestamp    DateTime @default(now())
+  fileName     String
+  fileSize     Int?     // Size in bytes
+  fileType     String?
+  chunksCount  Int?     // Number of chunks created
+  success      Boolean  @default(true)
+  errorMessage String?
+  durationMs   Int?     // Processing time in milliseconds
+  userId       String?  // Who initiated the ingestion
+  
+  @@index([timestamp])
+  @@index([success])
+  @@index([userId])
+}

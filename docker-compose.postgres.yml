@@ -1,0 +1,30 @@
+# Docker Compose Override for PostgreSQL
+# Use this to enable PostgreSQL instead of SQLite
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+#
+# Or create a symlink:
+#   ln -s docker-compose.postgres.yml docker-compose.override.yml
+#   docker-compose up -d
+
+version: '3.8'
+
+services:
+  kora-web:
+    environment:
+      # Override to use PostgreSQL
+      - DATABASE_URL=postgresql://kora:kora_password@postgres:5432/kora
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true
+
+  kora-api:
+    environment:
+      # Override to use PostgreSQL
+      - DATABASE_URL=postgresql://kora:kora_password@postgres:5432/kora
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true

@@ -21,6 +21,9 @@ dependencies = [
   "fastapi>=0.104.0",
   "uvicorn>=0.24.0",
   "pydantic>=2.0.0",
+  "prisma>=0.11.0",
+  "aiosqlite>=0.19.0",
+  "tabulate>=0.9.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +40,7 @@ kora-auth = "kora.auth_cli:main"
 kora-api = "kora.api_launcher:main"
 kora-hide = "kora.obfuscate_cli:main"
 kora-admin = "kora.admin_ui:main"
+kora-logs = "kora.logs_viewer:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
